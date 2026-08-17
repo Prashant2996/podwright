@@ -1,0 +1,200 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-k8s-dark text-gray-100;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #1e293b;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+
+  /* Light mode overrides */
+  .light body,
+  .light {
+    --bg-primary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #1e293b;
+    --border-color: #e2e8f0;
+  }
+
+  .light body {
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
+  }
+
+  .light .bg-k8s-dark {
+    background-color: #f8fafc !important;
+  }
+
+  .light .bg-sidebar {
+    background-color: #ffffff !important;
+    border-right: 1px solid #e2e8f0;
+  }
+
+  .light .bg-card {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+  }
+
+  .light .bg-gray-800 {
+    background-color: #f1f5f9 !important;
+  }
+
+  .light .bg-gray-900 {
+    background-color: #f8fafc !important;
+  }
+
+  .light .text-white {
+    color: #1e293b !important;
+  }
+
+  .light .text-gray-100 {
+    color: #1e293b !important;
+  }
+
+  .light .text-gray-200 {
+    color: #334155 !important;
+  }
+
+  .light .text-gray-300 {
+    color: #475569 !important;
+  }
+
+  .light .text-gray-400 {
+    color: #64748b !important;
+  }
+
+  .light .border-gray-700 {
+    border-color: #e2e8f0 !important;
+  }
+
+  .light .border-gray-700\/50 {
+    border-color: rgba(226, 232, 240, 0.5) !important;
+  }
+
+  .light .border-gray-600 {
+    border-color: #cbd5e1 !important;
+  }
+
+  .light select,
+  .light input,
+  .light textarea {
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
+    border-color: #cbd5e1 !important;
+  }
+
+  .light .nav-item:hover {
+    background-color: #e2e8f0 !important;
+  }
+
+  .light .nav-item.active {
+    background-color: #dbeafe !important;
+    border-left-color: #326CE5 !important;
+  }
+
+  /* Light mode status badges */
+  .light .status-running {
+    background-color: #dcfce7 !important;
+    color: #166534 !important;
+    border-color: #86efac !important;
+  }
+
+  .light .status-pending {
+    background-color: #fef9c3 !important;
+    color: #854d0e !important;
+    border-color: #fde047 !important;
+  }
+
+  .light .status-failed {
+    background-color: #fee2e2 !important;
+    color: #991b1b !important;
+    border-color: #fca5a5 !important;
+  }
+
+  .light .status-succeeded {
+    background-color: #dbeafe !important;
+    color: #1e40af !important;
+    border-color: #93c5fd !important;
+  }
+
+  /* Light mode buttons */
+  .light .btn-danger {
+    background-color: #fca5a5 !important;
+    color: #991b1b !important;
+  }
+
+  .light .btn-primary {
+    background-color: #4f87f0 !important;
+    color: #ffffff !important;
+  }
+
+  .light .shadow-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05) !important;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-card border border-gray-700/50 rounded-lg shadow-lg;
+  }
+
+  .btn-primary {
+    @apply bg-k8s-blue hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2 rounded-md text-sm font-medium transition-colors border border-gray-600;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .input {
+    @apply bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-k8s-blue focus:ring-1 focus:ring-k8s-blue;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800/50 hover:text-white rounded-md mx-2 transition-colors cursor-pointer;
+  }
+
+  .nav-item.active {
+    @apply bg-k8s-blue/10 text-white border-l-2 border-k8s-blue;
+  }
+}
+
+/* Toast animation */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-enter {
+  animation: slideIn 0.3s ease-out;
+}
