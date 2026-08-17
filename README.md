@@ -1,6 +1,6 @@
 # Podwright
 
-A lightweight, fast Kubernetes management dashboard for developers. An alternative to Lens and Headlamp that starts in under 3 seconds, focused on daily developer workflows.
+A fast, developer-first Kubernetes management dashboard with built-in troubleshooting, namespace automation, and real-time change tracking. Starts in under 3 seconds. No database, no external services.
 
 ![Workloads Overview](docs/screenshots/01-overview.png)
 
