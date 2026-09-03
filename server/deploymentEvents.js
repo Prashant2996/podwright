@@ -89,8 +89,8 @@ async function checkNamespace(namespace) {
 
   try {
     // Check deployment image changes
-    const depResult = await appsApi.listNamespacedDeployment(namespace);
-    for (const dep of depResult.body.items) {
+    const depResult = await appsApi.listNamespacedDeployment({ namespace });
+    for (const dep of depResult.items) {
       const name = dep.metadata.name;
       const key = `${namespace}/${name}`;
       const currentImage = dep.spec.template.spec.containers[0]?.image || '';
@@ -116,10 +116,10 @@ async function checkNamespace(namespace) {
     }
 
     // Check for pod crash spikes
-    const podResult = await coreApi.listNamespacedPod(namespace);
+    const podResult = await coreApi.listNamespacedPod({ namespace });
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
-    for (const pod of podResult.body.items) {
+    for (const pod of podResult.items) {
       const containerStatuses = pod.status?.containerStatuses || [];
       for (const cs of containerStatuses) {
         if (cs.restartCount >= CRASH_THRESHOLD) {

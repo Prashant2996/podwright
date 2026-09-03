@@ -94,4 +94,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 ## License
 
-MIT
+Podwright is licensed under the **GNU AGPL-3.0**. You are free to use, modify,
+and self-host it. If you run a modified version as a network service, you must
+make your source code available under the same license.
+
+For commercial licensing (to use Podwright in a closed-source or proprietary
+product), contact the author.
+
+See [LICENSE](LICENSE) and [LICENSE-AGPL-3.0.txt](LICENSE-AGPL-3.0.txt).

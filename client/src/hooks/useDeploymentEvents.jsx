@@ -16,6 +16,15 @@ export function DeploymentEventsProvider({ children }) {
   const [username, setUsername] = useState('');
   const wsRef = useRef(null);
   const namespaceRef = useRef('');
+  const reconnectTimerRef = useRef(null);
+  const notificationsRef = useRef(browserNotifications);
+  const isMountedRef = useRef(true);
+
+  // Keep a ref of the latest browserNotifications so the WS handler always sees
+  // the current value without needing to reconnect the socket.
+  useEffect(() => {
+    notificationsRef.current = browserNotifications;
+  }, [browserNotifications]);
 
   // Fetch username
   useEffect(() => {
@@ -34,12 +43,14 @@ export function DeploymentEventsProvider({ children }) {
     localStorage.setItem('podwright-browser-notifications', String(browserNotifications));
   }, [browserNotifications]);
 
-  // WebSocket connection
+  // WebSocket connection (established once, does NOT reconnect on state changes)
   useEffect(() => {
+    isMountedRef.current = true;
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
-    
+
     function connect() {
+      if (!isMountedRef.current) return;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
@@ -55,8 +66,7 @@ export function DeploymentEventsProvider({ children }) {
             setEvents(prev => [msg.event, ...prev].slice(0, 100));
             setUnreadCount(prev => prev + 1);
 
-            // Browser notification
-            if (browserNotifications && Notification.permission === 'granted') {
+            if (notificationsRef.current && Notification.permission === 'granted') {
               new Notification('Podwright', {
                 body: msg.event.message,
                 icon: '/favicon.svg',
@@ -68,8 +78,10 @@ export function DeploymentEventsProvider({ children }) {
 
       ws.onclose = () => {
         setConnected(false);
-        // Reconnect after 5 seconds
-        setTimeout(connect, 5000);
+        // Reconnect only if still mounted
+        if (isMountedRef.current) {
+          reconnectTimerRef.current = setTimeout(connect, 5000);
+        }
       };
 
       ws.onerror = () => {
@@ -79,11 +91,17 @@ export function DeploymentEventsProvider({ children }) {
 
     connect();
     return () => {
+      isMountedRef.current = false;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       if (wsRef.current) {
+        wsRef.current.onclose = null; // prevent reconnect on intentional close
         wsRef.current.close();
       }
     };
-  }, [browserNotifications]);
+  }, []);
 
   const markAllRead = useCallback(() => {
     setUnreadCount(0);

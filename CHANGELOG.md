@@ -5,6 +5,37 @@ All notable changes to Podwright will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- Removed command-injection surface in namespace cleanup: the client now sends
+  typed actions instead of raw shell commands; the server executes a fixed
+  registry of commands via execFile with argument arrays and validates all
+  Kubernetes names (RFC 1123).
+- Cronjob trigger and cleanup preview now use execFile (no shell interpolation).
+- TLS verification for raw PATCH calls now uses a per-request HTTPS agent
+  instead of mutating the global NODE_TLS_REJECT_UNAUTHORIZED flag.
+- Upstream Kubernetes API error bodies are no longer leaked to clients.
+- RBAC permission checks now fail closed (deny on error) instead of fail open.
+
+### Fixed
+- Deployment change event tracking now works (was using wrong response shape).
+- Compare, clone, and troubleshoot endpoints now use the correct
+  @kubernetes/client-node v1.x object-argument API form.
+- Deploy scale endpoint validates replica count (0-1000).
+
+### Changed
+- License changed from MIT to AGPL-3.0-or-later to protect against
+  closed-source commercial forks while keeping the project open source.
+- Dockerfile is now multi-stage and installs kubectl and helm (required by
+  cleanup, apply, exec, port-forward, and cronjob features).
+
+### Performance / Reliability
+- In-memory cache now periodically evicts expired entries.
+- WebSocket log/exec streams apply backpressure (drop on slow clients).
+- Client WebSocket no longer reconnects on notification-toggle and clears
+  reconnect timers on unmount.
+
 ## [0.1.0] - 2026-08-17
 
 ### Added

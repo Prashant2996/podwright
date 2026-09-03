@@ -2,7 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const { WebSocketServer } = require('ws');
-const { exec, execSync, spawn } = require('child_process');
+const { exec, execSync, execFile, spawn } = require('child_process');
+const https = require('https');
 const os = require('os');
 const k8s = require('@kubernetes/client-node');
 const path = require('path');
@@ -62,6 +63,42 @@ function invalidateNamespace(ns) {
   }
 }
 
+// Periodic sweep to evict expired entries (prevents unbounded memory growth)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of cache.entries()) {
+    if (now - entry.time >= CACHE_TTL) {
+      cache.delete(key);
+    }
+  }
+}, 30000).unref();
+
+// --- Input Validation (prevents command injection) ---
+// Kubernetes names follow RFC 1123: lowercase alphanumeric, '-', '.', max 253 chars
+const K8S_NAME_RE = /^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/;
+
+function isValidK8sName(name) {
+  return typeof name === 'string' && name.length > 0 && name.length <= 253 && K8S_NAME_RE.test(name);
+}
+
+function validateNames(...names) {
+  for (const n of names) {
+    if (!isValidK8sName(n)) {
+      throw new Error(`Invalid Kubernetes name: "${n}"`);
+    }
+  }
+}
+
+// Safe command execution using execFile (no shell = no injection)
+function execFileAsync(cmd, args) {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, { timeout: 60000, maxBuffer: 5 * 1024 * 1024 }, (error, stdout, stderr) => {
+      // For cleanup we tolerate non-zero exit (resource may not exist)
+      resolve((stdout || '') + (stderr || ''));
+    });
+  });
+}
+
 // --- k8sPatch: Raw PATCH using native fetch with exec-based token ---
 async function k8sPatch(resourcePath, body, patchType = 'strategic-merge-patch') {
   const cluster = kc.getCurrentCluster();
@@ -104,34 +141,68 @@ async function k8sPatch(resourcePath, body, patchType = 'strategic-merge-patch')
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // Handle TLS
+  // Build a per-request HTTPS agent for TLS handling (never mutate global TLS state)
+  const agentOptions = {};
+  if (cluster.skipTLSVerify) {
+    agentOptions.rejectUnauthorized = false;
+  }
+  if (cluster.caData) {
+    agentOptions.ca = Buffer.from(cluster.caData, 'base64');
+  } else if (cluster.caFile) {
+    try {
+      agentOptions.ca = require('fs').readFileSync(cluster.caFile);
+    } catch (e) { /* fall back to system CAs */ }
+  }
+  const agent = new https.Agent(agentOptions);
+
   const fetchOptions = {
     method: 'PATCH',
     headers,
     body: JSON.stringify(body),
+    // Node's fetch uses the `dispatcher` option; but for broad compat we use a
+    // Node https request wrapper when a custom agent is required.
   };
 
-  if (cluster.skipTLSVerify) {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-  }
-
-  if (cluster.caFile || cluster.caData) {
-    // For simplicity with native fetch, we rely on NODE_TLS_REJECT_UNAUTHORIZED
-    // In production, you'd use a custom agent
-  }
-
-  const response = await fetch(url, fetchOptions);
+  const response = await httpsPatch(url, fetchOptions, agent);
   if (!response.ok) {
-    const errBody = await response.text();
-    throw new Error(`PATCH ${resourcePath} failed (${response.status}): ${errBody}`);
+    // Do not leak raw upstream error bodies to the client
+    throw new Error(`PATCH failed with status ${response.status}`);
   }
-  return response.json();
+  return response.data;
+}
+
+// Minimal HTTPS PATCH using Node's https module with a custom agent (per-request TLS)
+function httpsPatch(url, options, agent) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = https.request({
+      hostname: u.hostname,
+      port: u.port || 443,
+      path: u.pathname + u.search,
+      method: 'PATCH',
+      headers: options.headers,
+      agent,
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        const ok = res.statusCode >= 200 && res.statusCode < 300;
+        let parsed = {};
+        try { parsed = data ? JSON.parse(data) : {}; } catch (e) { parsed = {}; }
+        resolve({ ok, status: res.statusCode, data: parsed });
+      });
+    });
+    req.on('error', reject);
+    req.write(options.body);
+    req.end();
+  });
 }
 
 // --- Cleanup Jobs (in-memory, non-blocking) ---
 const cleanupJobs = new Map();
 
 function createCleanupJob(namespace, actions) {
+  validateNames(namespace);
   const jobId = `cleanup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const job = {
     id: jobId,
@@ -152,21 +223,43 @@ function createCleanupJob(namespace, actions) {
   return jobId;
 }
 
+// Server-side cleanup action registry. The client sends an action TYPE + params,
+// never a raw command. Each handler builds args safely via execFile.
+// namespace is validated before any handler runs.
+const CLEANUP_ACTIONS = {
+  'delete-completed-pods': async (ns) => {
+    await execFileAsync('kubectl', ['delete', 'pods', '--field-selector=status.phase==Succeeded', '-n', ns]);
+    await execFileAsync('kubectl', ['delete', 'pods', '--field-selector=status.phase==Failed', '-n', ns]);
+    return 'Deleted completed and failed pods';
+  },
+  'delete-kafka-topics': async (ns) => {
+    const out = await execFileAsync('kubectl', ['delete', 'kafkatopics', '--all', '-n', ns]);
+    return out.trim() || 'Deleted Kafka topics';
+  },
+  'scale-down-all': async (ns) => {
+    const out = await execFileAsync('kubectl', ['scale', 'deployment', '--all', '--replicas=0', '-n', ns]);
+    return out.trim() || 'Scaled all deployments to 0';
+  },
+  'helm-uninstall': async (ns, params) => {
+    validateNames(params.release);
+    const out = await execFileAsync('helm', ['uninstall', params.release, '-n', ns]);
+    return out.trim() || `Uninstalled ${params.release}`;
+  },
+};
+
 async function executeCleanupActions(job, actions) {
   for (const action of actions) {
-    const step = { name: action.name, status: 'running', message: '' };
+    const handler = CLEANUP_ACTIONS[action.type];
+    const step = { name: action.name || action.type, status: 'running', message: '' };
     job.steps.push(step);
 
     try {
-      if (action.command) {
-        const result = await execAsync(`${action.command} 2>&1 || true`);
-        step.status = 'completed';
-        step.message = result.trim().substring(0, 500);
-      } else if (action.type === 'delete-resources') {
-        await deleteResources(job.namespace, action);
-        step.status = 'completed';
-        step.message = `Deleted ${action.resourceType || 'resources'}`;
+      if (!handler) {
+        throw new Error(`Unknown cleanup action: ${action.type}`);
       }
+      step.message = await handler(job.namespace, action.params || {});
+      step.status = 'completed';
+      step.message = String(step.message).substring(0, 500);
     } catch (e) {
       step.status = 'error';
       step.message = e.message.substring(0, 500);
@@ -176,24 +269,6 @@ async function executeCleanupActions(job, actions) {
   }
   job.status = 'completed';
   broadcastCleanupUpdate(job);
-}
-
-async function deleteResources(namespace, action) {
-  if (action.command) {
-    await execAsync(`${action.command} 2>&1 || true`);
-  }
-}
-
-function execAsync(command) {
-  return new Promise((resolve, reject) => {
-    exec(command, { timeout: 60000, maxBuffer: 5 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error && !stdout && !stderr) {
-        reject(error);
-      } else {
-        resolve(stdout || stderr || '');
-      }
-    });
-  });
 }
 
 // --- Identity Detection ---
@@ -227,6 +302,15 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 
 // Track connected clients
 const wsClients = new Set();
+
+// Max buffered bytes before we drop messages to a slow client (backpressure)
+const WS_MAX_BUFFER = 5 * 1024 * 1024; // 5MB
+
+function safeSend(ws, payload) {
+  if (ws.readyState !== 1) return;
+  if (ws.bufferedAmount > WS_MAX_BUFFER) return; // drop instead of buffering unbounded
+  try { ws.send(payload); } catch (e) { /* client gone */ }
+}
 
 wss.on('connection', (ws) => {
   wsClients.add(ws);
@@ -276,7 +360,7 @@ function handleWsMessage(ws, msg, streams, execProcesses) {
       });
 
       logStream.on('data', (chunk) => {
-        ws.send(JSON.stringify({ type: 'log-data', data: chunk.toString() }));
+        safeSend(ws, JSON.stringify({ type: 'log-data', data: chunk.toString() }));
       });
 
       logStream.on('error', (e) => {
@@ -312,11 +396,11 @@ function handleWsMessage(ws, msg, streams, execProcesses) {
       ], { env: process.env });
 
       proc.stdout.on('data', (data) => {
-        ws.send(JSON.stringify({ type: 'exec-output', data: data.toString() }));
+        safeSend(ws, JSON.stringify({ type: 'exec-output', data: data.toString() }));
       });
 
       proc.stderr.on('data', (data) => {
-        ws.send(JSON.stringify({ type: 'exec-output', data: data.toString() }));
+        safeSend(ws, JSON.stringify({ type: 'exec-output', data: data.toString() }));
       });
 
       proc.on('close', (code) => {
@@ -493,10 +577,14 @@ app.get('/api/deployments/:namespace/:name', async (req, res) => {
 app.put('/api/deployments/:namespace/:name/scale', async (req, res) => {
   const { namespace, name } = req.params;
   const { replicas } = req.body;
+  const count = parseInt(replicas);
+  if (isNaN(count) || count < 0 || count > 1000) {
+    return res.status(400).json({ error: 'replicas must be a number between 0 and 1000' });
+  }
   try {
     await k8sPatch(
       `/apis/apps/v1/namespaces/${namespace}/deployments/${name}/scale`,
-      { spec: { replicas: parseInt(replicas) } },
+      { spec: { replicas: count } },
       'merge-patch'
     );
     invalidateNamespace(namespace);
@@ -1128,12 +1216,13 @@ app.put('/api/cronjobs/:namespace/:name/suspend', async (req, res) => {
 app.post('/api/cronjobs/:namespace/:name/trigger', async (req, res) => {
   const { namespace, name } = req.params;
   try {
+    validateNames(namespace, name);
     const jobName = `${name}-manual-${Date.now()}`;
-    const result = await execAsync(`kubectl create job ${jobName} --from=cronjob/${name} -n ${namespace} 2>&1`);
+    const result = await execFileAsync('kubectl', ['create', 'job', jobName, `--from=cronjob/${name}`, '-n', namespace]);
     invalidateNamespace(namespace);
     res.json({ success: true, jobName, output: result.trim() });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(400).json({ error: e.message });
   }
 });
 
@@ -1311,8 +1400,8 @@ app.get('/api/compare/deployments', async (req, res) => {
 
   try {
     const [left, right] = await Promise.all([
-      appsApi.listNamespacedDeployment(ns1).then(r => r.items),
-      appsApi.listNamespacedDeployment(ns2).then(r => r.items),
+      appsApi.listNamespacedDeployment({ namespace: ns1 }).then(r => r.items),
+      appsApi.listNamespacedDeployment({ namespace: ns2 }).then(r => r.items),
     ]);
 
     const leftMap = new Map(left.map(d => [d.metadata.name, d]));
@@ -1348,8 +1437,8 @@ app.get('/api/compare/configmaps', async (req, res) => {
 
   try {
     const [left, right] = await Promise.all([
-      k8sApi.listNamespacedConfigMap(ns1).then(r => r.items),
-      k8sApi.listNamespacedConfigMap(ns2).then(r => r.items),
+      k8sApi.listNamespacedConfigMap({ namespace: ns1 }).then(r => r.items),
+      k8sApi.listNamespacedConfigMap({ namespace: ns2 }).then(r => r.items),
     ]);
 
     const leftMap = new Map(left.map(c => [c.metadata.name, c]));
@@ -1383,8 +1472,8 @@ app.get('/api/compare/configmap-detail', async (req, res) => {
 
   try {
     const [left, right] = await Promise.all([
-      k8sApi.readNamespacedConfigMap(name, ns1).then(r => r).catch(() => null),
-      k8sApi.readNamespacedConfigMap(name, ns2).then(r => r).catch(() => null),
+      k8sApi.readNamespacedConfigMap({ name, namespace: ns1 }).then(r => r).catch(() => null),
+      k8sApi.readNamespacedConfigMap({ name, namespace: ns2 }).then(r => r).catch(() => null),
     ]);
 
     const leftData = left?.data || {};
@@ -1501,9 +1590,10 @@ app.post('/api/clone-service', async (req, res) => {
 app.get('/api/cleanup/:namespace/preview', async (req, res) => {
   const { namespace } = req.params;
   try {
+    validateNames(namespace);
     const [helmReleases, pods, jobs] = await Promise.all([
-      execAsync(`helm list -n ${namespace} --short 2>&1 || true`).then(r => r.trim().split('\n').filter(Boolean)),
-      k8sApi.listNamespacedPod({namespace}).then(r => 
+      execFileAsync('helm', ['list', '-n', namespace, '--short']).then(r => r.trim().split('\n').filter(Boolean)),
+      k8sApi.listNamespacedPod({namespace}).then(r =>
         r.items.filter(p => p.status.phase === 'Succeeded' || p.status.phase === 'Failed')
       ),
       batchApi.listNamespacedJob({namespace}).then(r =>
@@ -1513,7 +1603,7 @@ app.get('/api/cleanup/:namespace/preview', async (req, res) => {
 
     let kafkaTopics = [];
     try {
-      const kt = await execAsync(`kubectl get kafkatopics -n ${namespace} -o jsonpath='{.items[*].metadata.name}' 2>&1 || true`);
+      const kt = await execFileAsync('kubectl', ['get', 'kafkatopics', '-n', namespace, '-o', 'jsonpath={.items[*].metadata.name}']);
       kafkaTopics = kt.trim().split(' ').filter(Boolean);
     } catch (e) {}
 
@@ -1524,7 +1614,7 @@ app.get('/api/cleanup/:namespace/preview', async (req, res) => {
       kafkaTopics: kafkaTopics.length,
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(400).json({ error: e.message });
   }
 });
 
@@ -1534,9 +1624,19 @@ app.post('/api/cleanup/:namespace/execute', async (req, res) => {
   if (!actions || !actions.length) {
     return res.status(400).json({ error: 'actions array required' });
   }
-
-  const jobId = createCleanupJob(namespace, actions);
-  res.json({ jobId });
+  try {
+    validateNames(namespace);
+    // Reject any action that isn't a known safe type
+    for (const a of actions) {
+      if (!a.type || !CLEANUP_ACTIONS[a.type]) {
+        return res.status(400).json({ error: `Unknown or missing action type: ${a.type}` });
+      }
+    }
+    const jobId = createCleanupJob(namespace, actions);
+    res.json({ jobId });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 app.get('/api/cleanup/job/:jobId', (req, res) => {
@@ -1553,7 +1653,7 @@ app.get('/api/troubleshoot/:namespace/:podName', async (req, res) => {
   try {
     // Gather all diagnostic data
     const [pod, events] = await Promise.all([
-      k8sApi.readNamespacedPod(podName, namespace),
+      k8sApi.readNamespacedPod({ name: podName, namespace }),
       k8sApi.listNamespacedEvent({namespace, fieldSelector: `involvedObject.name=${podName},involvedObject.kind=Pod`}),
     ]);
 
@@ -1892,8 +1992,8 @@ app.get('/api/rbac/can-i', async (req, res) => {
       reason: result?.status?.reason || '',
     });
   } catch (e) {
-    // If the API fails, assume allowed (fail-open for usability)
-    res.json({ allowed: true, verb, resource, namespace: namespace || '*', reason: 'RBAC check unavailable' });
+    // Fail closed: if we can't verify the permission, deny it
+    res.json({ allowed: false, verb, resource, namespace: namespace || '*', reason: 'RBAC check failed' });
   }
 });
 
@@ -1926,7 +2026,7 @@ app.post('/api/rbac/can-i-bulk', async (req, res) => {
             allowed: result?.status?.allowed || false,
           };
         } catch (e) {
-          return { ...check, allowed: true }; // fail-open
+          return { ...check, allowed: false }; // fail closed
         }
       })
     );
@@ -1963,7 +2063,7 @@ app.get('/api/rbac/permissions/:namespace', async (req, res) => {
               const result = await authClient.createSelfSubjectAccessReview(review);
               permissions[resource][verb] = result?.status?.allowed || false;
             } catch (e) {
-              permissions[resource][verb] = true; // fail-open
+              permissions[resource][verb] = false; // fail closed
             }
           })
         );
@@ -1985,7 +2085,7 @@ app.post('/api/apply', async (req, res) => {
 
   try {
     // Use kubectl apply via stdin for maximum compatibility with all resource types
-    const ns = namespace ? `-n ${namespace}` : '';
+    if (namespace) validateNames(namespace);
     const proc = spawn('kubectl', ['apply', ...(namespace ? ['-n', namespace] : []), '-f', '-'], {
       env: process.env,
     });

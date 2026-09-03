@@ -256,7 +256,7 @@ export default function NamespaceCleanup({ namespace, namespaces }) {
                 </svg>
               }
               onExecute={() => executeCleanup(
-                [{ name: 'Delete completed pods and jobs', command: `kubectl delete pods --field-selector=status.phase==Succeeded -n ${namespace} && kubectl delete pods --field-selector=status.phase==Failed -n ${namespace}` }],
+                [{ name: 'Delete completed pods and jobs', type: 'delete-completed-pods' }],
                 `Delete ${preview.completedPods} completed/failed pods in ${namespace}`
               )}
             />
@@ -269,7 +269,7 @@ export default function NamespaceCleanup({ namespace, namespaces }) {
                 </svg>
               }
               onExecute={() => executeCleanup(
-                [{ name: 'Delete kafka topics', command: `kubectl delete kafkatopics --all -n ${namespace}` }],
+                [{ name: 'Delete kafka topics', type: 'delete-kafka-topics' }],
                 `Delete all ${preview.kafkaTopics} Kafka topics in ${namespace}`
               )}
             />
@@ -282,7 +282,7 @@ export default function NamespaceCleanup({ namespace, namespaces }) {
                 </svg>
               }
               onExecute={() => executeCleanup(
-                (preview.helmReleases || []).map(r => ({ name: `Uninstall ${r}`, command: `helm uninstall ${r} -n ${namespace}` })),
+                (preview.helmReleases || []).map(r => ({ name: `Uninstall ${r}`, type: 'helm-uninstall', params: { release: r } })),
                 `Uninstall all ${preview.helmReleases?.length || 0} Helm releases in ${namespace}`
               )}
             />
@@ -295,7 +295,7 @@ export default function NamespaceCleanup({ namespace, namespaces }) {
                 </svg>
               }
               onExecute={() => executeCleanup(
-                [{ name: 'Scale down all deployments', command: `kubectl scale deployment --all --replicas=0 -n ${namespace}` }],
+                [{ name: 'Scale down all deployments', type: 'scale-down-all' }],
                 `Scale ALL deployments to 0 replicas in ${namespace}`
               )}
               variant="danger"
@@ -312,7 +312,7 @@ export default function NamespaceCleanup({ namespace, namespaces }) {
                     <span className="text-xs font-mono text-gray-300">{release}</span>
                     <button
                       onClick={() => executeCleanup(
-                        [{ name: `Uninstall ${release}`, command: `helm uninstall ${release} -n ${namespace}` }],
+                        [{ name: `Uninstall ${release}`, type: 'helm-uninstall', params: { release } }],
                         `Uninstall Helm release "${release}" in ${namespace}`
                       )}
                       className="text-[10px] text-red-400 hover:text-red-300"
@@ -335,11 +335,10 @@ export default function NamespaceCleanup({ namespace, namespaces }) {
               <button
                 onClick={() => executeCleanup(
                   [
-                    { name: 'Delete completed pods', command: `kubectl delete pods --field-selector=status.phase==Succeeded -n ${namespace}` },
-                    { name: 'Delete failed pods', command: `kubectl delete pods --field-selector=status.phase==Failed -n ${namespace}` },
-                    ...(preview.helmReleases || []).map(r => ({ name: `Uninstall ${r}`, command: `helm uninstall ${r} -n ${namespace}` })),
-                    { name: 'Delete kafka topics', command: `kubectl delete kafkatopics --all -n ${namespace}` },
-                    { name: 'Scale down all', command: `kubectl scale deployment --all --replicas=0 -n ${namespace}` },
+                    { name: 'Delete completed & failed pods', type: 'delete-completed-pods' },
+                    ...(preview.helmReleases || []).map(r => ({ name: `Uninstall ${r}`, type: 'helm-uninstall', params: { release: r } })),
+                    { name: 'Delete kafka topics', type: 'delete-kafka-topics' },
+                    { name: 'Scale down all', type: 'scale-down-all' },
                   ],
                   `Run FULL cleanup on ${namespace}: delete pods, uninstall all Helm releases, delete Kafka topics, scale down all deployments`
                 )}
