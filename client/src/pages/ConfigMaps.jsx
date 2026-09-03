@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { useToast } from '../components/Toast';
@@ -24,6 +24,15 @@ export default function ConfigMaps({ namespace }) {
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const { addToast } = useToast();
+  const textareaRef = useRef(null);
+  const gutterRef = useRef(null);
+
+  // Keep the line-number gutter scroll in sync with the textarea
+  const handleEditorScroll = () => {
+    if (gutterRef.current && textareaRef.current) {
+      gutterRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  };
 
   const fetchData = useCallback(async () => {
     if (!namespace) return;
@@ -172,12 +181,26 @@ export default function ConfigMaps({ namespace }) {
             <SyntaxHighlight content={editorContent} />
           </div>
         ) : (
-          <textarea
-            value={editorContent}
-            onChange={e => setEditorContent(e.target.value)}
-            className="flex-1 w-full bg-[#0d1117] text-[#e6edf3] font-mono text-sm leading-6 p-4 rounded-lg border border-gray-700 focus:outline-none focus:border-k8s-blue resize-none min-h-[500px]"
-            spellCheck={false}
-          />
+          <div className="flex-1 flex rounded-lg border border-gray-700 overflow-hidden bg-[#0d1117] focus-within:border-k8s-blue min-h-[500px]">
+            {/* Line-number gutter (synced scroll, non-selectable) */}
+            <div
+              ref={gutterRef}
+              className="select-none text-right text-gray-600 font-mono text-sm leading-6 py-4 pl-3 pr-2 overflow-hidden bg-[#0d1117] border-r border-gray-800"
+              aria-hidden="true"
+            >
+              {editorContent.split('\n').map((_, i) => (
+                <div key={i}>{i + 1}</div>
+              ))}
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={editorContent}
+              onChange={e => setEditorContent(e.target.value)}
+              onScroll={handleEditorScroll}
+              className="flex-1 w-full bg-[#0d1117] text-[#e6edf3] font-mono text-sm leading-6 py-4 px-3 focus:outline-none resize-none"
+              spellCheck={false}
+            />
+          </div>
         )}
       </div>
     );
