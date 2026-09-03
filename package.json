@@ -11,7 +11,12 @@
     "test": "node server/pro.test.js",
     "install:all": "npm install && cd client && npm install"
   },
-  "keywords": ["kubernetes", "dashboard", "k8s", "devtools"],
+  "keywords": [
+    "kubernetes",
+    "dashboard",
+    "k8s",
+    "devtools"
+  ],
   "author": "",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
@@ -21,7 +26,7 @@
     "ws": "^8.16.0"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^10.0.5"
   },
   "overrides": {
     "qs": "^6.15.4"

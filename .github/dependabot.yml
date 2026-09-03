@@ -5,24 +5,64 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    # ~bi-weekly effect: only surface after 14 days of a release being out
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 3
     labels: ["dependencies"]
+    groups:
+      server-deps:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    # Don't auto-PR risky major bumps of core runtime deps
+    ignore:
+      - dependency-name: "express"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@kubernetes/client-node"
+        update-types: ["version-update:semver-major"]
 
   # Client dependencies
   - package-ecosystem: "npm"
     directory: "/client"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 3
     labels: ["dependencies"]
+    groups:
+      client-deps:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      # Major framework bumps require manual testing
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
 
   # Fulfillment service dependencies
   - package-ecosystem: "npm"
     directory: "/fulfillment"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 3
     labels: ["dependencies"]
+    groups:
+      fulfillment-deps:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "express"
+        update-types: ["version-update:semver-major"]
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -30,3 +70,6 @@ updates:
     schedule:
       interval: "monthly"
     labels: ["ci"]
+    groups:
+      actions:
+        patterns: ["*"]
