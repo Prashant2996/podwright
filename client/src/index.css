@@ -115,6 +115,40 @@
   .light .bg-gray-700\/70.text-gray-300 {
     color: #475569 !important;
   }
+  .light .bg-gray-700\/50 {
+    background-color: #e2e8f0 !important;
+  }
+
+  /* Translucent colored pill badges (tags, types, severities) need darker
+     text and slightly stronger backgrounds to be readable on white */
+  .light .bg-purple-500\/20 { background-color: #ede9fe !important; }
+  .light .text-purple-300,
+  .light .text-purple-400 { color: #7c3aed !important; }
+
+  .light .bg-blue-500\/20 { background-color: #dbeafe !important; }
+  .light .text-blue-300,
+  .light .text-blue-400 { color: #2563eb !important; }
+
+  .light .bg-green-500\/20 { background-color: #dcfce7 !important; }
+  .light .text-green-300,
+  .light .text-green-400 { color: #15803d !important; }
+
+  .light .bg-orange-500\/20 { background-color: #ffedd5 !important; }
+  .light .text-orange-300,
+  .light .text-orange-400 { color: #c2410c !important; }
+
+  .light .bg-red-500\/20 { background-color: #fee2e2 !important; }
+  .light .text-red-300,
+  .light .text-red-400 { color: #dc2626 !important; }
+
+  .light .bg-yellow-500\/20 { background-color: #fef9c3 !important; }
+  .light .text-yellow-300,
+  .light .text-yellow-400 { color: #a16207 !important; }
+
+  .light .text-emerald-400 { color: #059669 !important; }
+  .light .text-sky-400 { color: #0284c7 !important; }
+  .light .text-cyan-400 { color: #0891b2 !important; }
+  .light .text-pink-400 { color: #db2777 !important; }
 
   /* Scrollbar in light mode */
   .light ::-webkit-scrollbar-track {
