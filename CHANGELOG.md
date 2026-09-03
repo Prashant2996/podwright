@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deferred (breaking dependency upgrades - not adopted yet)
+These major upgrades were reviewed and intentionally deferred; Dependabot is
+configured to ignore them until a planned migration:
+- `@kubernetes/client-node` 2.x — removes `LogStream` (breaks WebSocket log
+  streaming) and switches to undici; needs code changes
+- `express` 5.x — breaking middleware/routing changes
+- `react` / `react-dom` 19.x — needs full UI regression testing
+- `tailwindcss` 4.x — new config system (full rewrite)
+- `vite` 8.x + `@vitejs/plugin-react` 6.x — recently moved to vite 7
+
 ### Added
 - **Podwright Pro** tier with LLM-powered troubleshooter (OpenAI / Anthropic,
   bring-your-own-key). Gated behind a license key.
