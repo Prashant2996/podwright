@@ -8,6 +8,7 @@
     "dev:server": "node --watch server/index.js",
     "build": "cd client && npm run build",
     "start": "NODE_ENV=production node server/index.js",
+    "test": "node server/pro.test.js",
     "install:all": "npm install && cd client && npm install"
   },
   "keywords": ["kubernetes", "dashboard", "k8s", "devtools"],

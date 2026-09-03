@@ -1,0 +1,83 @@
+name: Release
+
+# Runs when you push a version tag like v0.2.0
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # to create GitHub Releases
+  packages: write   # to push to GitHub Container Registry (ghcr.io)
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # Build the client so the release artifact is complete
+      - name: Install and build
+        run: |
+          npm ci
+          node server/pro.test.js
+          cd client && npm ci && npm run build
+
+      # --- Docker image to GitHub Container Registry ---
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata (tags)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --- GitHub Release ---
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            ## Podwright ${{ github.ref_name }}
+
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+
+            ### Install
+            ```bash
+            git clone https://github.com/${{ github.repository }}
+            cd podwright && npm run install:all && npm run dev
+            ```
+
+            ### Docker
+            ```bash
+            docker run -p 7070:7070 -v ~/.kube:/root/.kube:ro ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ```

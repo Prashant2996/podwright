@@ -27,7 +27,14 @@ jobs:
         run: npm ci
 
       - name: Check server syntax
-        run: node -c server/index.js && node -c server/deploymentEvents.js
+        run: |
+          node -c server/index.js
+          node -c server/deploymentEvents.js
+          node -c server/pro.js
+          node -c fulfillment/server.js
+
+      - name: Run Pro license tests
+        run: node server/pro.test.js
 
       - name: Install client dependencies
         working-directory: client
