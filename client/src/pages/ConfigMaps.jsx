@@ -238,51 +238,106 @@ function detectFormat(value) {
   return 'plain';
 }
 
+// Detailed format label + color for a key's value block.
+function formatBadge(fmt) {
+  const map = {
+    json: { label: 'JSON', cls: 'bg-purple-500/20 text-purple-300' },
+    yaml: { label: 'YAML', cls: 'bg-sky-500/20 text-sky-300' },
+    url: { label: 'URL', cls: 'bg-cyan-500/20 text-cyan-300' },
+    number: { label: 'number', cls: 'bg-emerald-500/20 text-emerald-300' },
+    bool: { label: 'boolean', cls: 'bg-amber-500/20 text-amber-300' },
+    text: { label: 'text', cls: 'bg-gray-500/20 text-gray-300' },
+  };
+  return map[fmt] || map.text;
+}
+
+// Richer format detection for the per-key badge (superset of detectFormat).
+function detectValueKind(value) {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return 'text';
+  const fmt = detectFormat(trimmed);
+  if (fmt === 'json') return 'json';
+  if (fmt === 'yaml') return 'yaml';
+  if (/^https?:\/\//.test(trimmed)) return 'url';
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return 'number';
+  if (trimmed === 'true' || trimmed === 'false') return 'bool';
+  return 'text';
+}
+
 /**
- * Block-aware highlighter. The editor content is a series of:
+ * Block-aware highlighter with line numbers (C) and per-key format badges (A).
+ * The editor content is a series of:
  *   # ─── Key: NAME ───
  *   <value lines...>
  *   ══════
- * We split into (comment header + value block) segments, detect each value
- * block's format (JSON / YAML / plain), and highlight it accordingly.
- * Single-key configmaps (no headers) are detected as a whole.
  */
 function SyntaxHighlight({ content }) {
   const lines = content.split('\n');
-  const out = [];
-  let block = [];
-  let key = 0;
+  const rows = []; // { no, node, key }
+  let block = [];        // [{ line, idx }]
+  let uid = 0;
 
   const flushBlock = () => {
     if (block.length === 0) return;
-    const blockText = block.join('\n');
-    const fmt = detectFormat(blockText);
-    block.forEach((line, i) => {
-      out.push(<div key={`b${key}-${i}`}>{highlightValueLine(line, fmt)}</div>);
+    const fmt = detectFormat(block.map(b => b.line).join('\n'));
+    block.forEach(({ line, idx }) => {
+      rows.push({ no: idx + 1, node: highlightValueLine(line, fmt), key: `b${uid++}` });
     });
     block = [];
-    key++;
   };
 
-  for (const line of lines) {
+  lines.forEach((line, idx) => {
     const trimmed = line.trim();
-    // Comment header (# ─── Key: NAME ───)
+
+    // Comment header (# ─── Key: NAME ───) — attach a format badge
+    const keyMatch = trimmed.match(/^#\s*[\u2500\- ]*Key:\s*(.+?)\s*[\u2500\- ]*$/);
     if (trimmed.startsWith('#')) {
       flushBlock();
-      out.push(<div key={`c${key++}`}><span className="text-gray-500 italic">{line}</span></div>);
-      continue;
+      // Look ahead to gather this key's value block for format detection
+      const vb = [];
+      for (let j = idx + 1; j < lines.length; j++) {
+        const t = lines[j].trim();
+        if (t.startsWith('#') || /^[=\u2550]+$/.test(t)) break;
+        vb.push(lines[j]);
+      }
+      const kind = detectValueKind(vb.join('\n'));
+      const badge = keyMatch ? formatBadge(kind) : null;
+      rows.push({
+        no: idx + 1,
+        key: `c${uid++}`,
+        node: (
+          <span className="flex items-center gap-2">
+            <span className="text-gray-500 italic">{line}</span>
+            {badge && (
+              <span className={`text-[9px] px-1.5 py-0.5 rounded-full not-italic ${badge.cls}`}>{badge.label}</span>
+            )}
+          </span>
+        ),
+      });
+      return;
     }
+
     // Separator between keys
     if (/^[=\u2550]+$/.test(trimmed)) {
       flushBlock();
-      out.push(<div key={`s${key++}`}><span className="text-gray-600">{line}</span></div>);
-      continue;
+      rows.push({ no: idx + 1, key: `s${uid++}`, node: <span className="text-gray-600">{line}</span> });
+      return;
     }
-    block.push(line);
-  }
+
+    block.push({ line, idx });
+  });
   flushBlock();
 
-  return <div>{out}</div>;
+  return (
+    <div>
+      {rows.map((row) => (
+        <div key={row.key} className="flex">
+          <span className="select-none text-gray-600 text-right pr-4 w-10 flex-shrink-0">{row.no}</span>
+          <span className="flex-1">{row.node}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // Highlight a single line according to the detected block format.
