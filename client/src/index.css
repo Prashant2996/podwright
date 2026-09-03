@@ -133,14 +133,64 @@
     border-color: #93c5fd !important;
   }
 
-  /* Light mode buttons */
-  .light .btn-danger {
-    background-color: #fca5a5 !important;
-    color: #991b1b !important;
+  /* Light mode buttons - solid, high-contrast colors */
+  .light .btn-primary {
+    background-color: #2563eb !important;
+    color: #ffffff !important;
+  }
+  .light .btn-primary:hover {
+    background-color: #1d4ed8 !important;
   }
 
-  .light .btn-primary {
-    background-color: #4f87f0 !important;
+  .light .btn-danger {
+    background-color: #dc2626 !important;
+    color: #ffffff !important;
+  }
+  .light .btn-danger:hover {
+    background-color: #b91c1c !important;
+  }
+
+  .light .btn-secondary {
+    background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+    border-color: #cbd5e1 !important;
+  }
+  .light .btn-secondary:hover {
+    background-color: #e2e8f0 !important;
+  }
+
+  /* Saturated colored action buttons (green/yellow bulk actions, filters)
+     keep white text and readable backgrounds in light mode */
+  .light .bg-green-700,
+  .light .bg-green-600 {
+    background-color: #16a34a !important;
+  }
+  .light .bg-green-700.text-white,
+  .light .bg-green-600.text-white {
+    color: #ffffff !important;
+  }
+  .light .bg-yellow-700,
+  .light .bg-yellow-600 {
+    background-color: #ca8a04 !important;
+  }
+  .light .bg-yellow-700.text-white,
+  .light .bg-yellow-600.text-white {
+    color: #ffffff !important;
+  }
+
+  /* Active/selected pills (filters, tabs, format toggles) keep white text */
+  .light .bg-k8s-blue.text-white,
+  .light .bg-red-600.text-white {
+    color: #ffffff !important;
+  }
+  .light .bg-red-600 {
+    background-color: #dc2626 !important;
+  }
+
+  /* Keep white text white on solid colored buttons (override the generic
+     .light .text-white -> dark rule for buttons specifically) */
+  .light .btn-primary,
+  .light .btn-danger {
     color: #ffffff !important;
   }
 
