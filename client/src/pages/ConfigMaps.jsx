@@ -223,57 +223,147 @@ export default function ConfigMaps({ namespace }) {
   );
 }
 
-function SyntaxHighlight({ content }) {
-  const lines = content.split('\n');
-  return (
-    <div>
-      {lines.map((line, i) => (
-        <div key={i}>{highlightLine(line)}</div>
-      ))}
-    </div>
-  );
+// Detect the format of a value string so we can highlight it correctly.
+function detectFormat(value) {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return 'plain';
+  // JSON: starts with { or [ and parses
+  if (/^[{[]/.test(trimmed)) {
+    try { JSON.parse(trimmed); return 'json'; } catch (e) { /* fall through */ }
+  }
+  // YAML: has "key:" lines or list dashes, and is multi-line or clearly structured
+  const lines = trimmed.split('\n');
+  const looksYaml = lines.some(l => /^\s*[\w.-]+\s*:\s*/.test(l) || /^\s*-\s+/.test(l));
+  if (looksYaml && (lines.length > 1 || /:\s*\S/.test(trimmed))) return 'yaml';
+  return 'plain';
 }
 
-function highlightLine(line) {
-  // Comment
-  if (line.trim().startsWith('#')) {
-    return <span className="text-gray-500 italic">{line}</span>;
-  }
-  // Separator
-  if (line.match(/^[=\u2550]+$/)) {
-    return <span className="text-gray-600">{line}</span>;
-  }
-  // Try YAML key: value
-  const yamlMatch = line.match(/^(\s*)([\w./-]+)(:)(.*)/);
-  if (yamlMatch) {
-    const value = yamlMatch[4].trim();
-    let valueClass = 'text-green-300';
-    if (value === 'true' || value === 'false') valueClass = 'text-amber-400';
-    else if (/^-?\d+(\.\d+)?$/.test(value)) valueClass = 'text-emerald-400';
-    else if (value === 'null' || value === '~') valueClass = 'text-gray-500 italic';
-    else if (value.match(/^https?:\/\//)) valueClass = 'text-cyan-300';
-    else if (value.startsWith('/')) valueClass = 'text-purple-300';
+/**
+ * Block-aware highlighter. The editor content is a series of:
+ *   # ─── Key: NAME ───
+ *   <value lines...>
+ *   ══════
+ * We split into (comment header + value block) segments, detect each value
+ * block's format (JSON / YAML / plain), and highlight it accordingly.
+ * Single-key configmaps (no headers) are detected as a whole.
+ */
+function SyntaxHighlight({ content }) {
+  const lines = content.split('\n');
+  const out = [];
+  let block = [];
+  let key = 0;
 
+  const flushBlock = () => {
+    if (block.length === 0) return;
+    const blockText = block.join('\n');
+    const fmt = detectFormat(blockText);
+    block.forEach((line, i) => {
+      out.push(<div key={`b${key}-${i}`}>{highlightValueLine(line, fmt)}</div>);
+    });
+    block = [];
+    key++;
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Comment header (# ─── Key: NAME ───)
+    if (trimmed.startsWith('#')) {
+      flushBlock();
+      out.push(<div key={`c${key++}`}><span className="text-gray-500 italic">{line}</span></div>);
+      continue;
+    }
+    // Separator between keys
+    if (/^[=\u2550]+$/.test(trimmed)) {
+      flushBlock();
+      out.push(<div key={`s${key++}`}><span className="text-gray-600">{line}</span></div>);
+      continue;
+    }
+    block.push(line);
+  }
+  flushBlock();
+
+  return <div>{out}</div>;
+}
+
+// Highlight a single line according to the detected block format.
+function highlightValueLine(line, fmt) {
+  if (fmt === 'json') return highlightJson(line);
+  if (fmt === 'yaml') return highlightYaml(line);
+  return highlightPlain(line);
+}
+
+function highlightJson(line) {
+  // "key": value
+  const m = line.match(/^(\s*)("[^"]+")(\s*:\s*)(.*)$/);
+  if (m) {
     return (
       <>
-        <span>{yamlMatch[1]}</span>
-        <span className="text-sky-400">{yamlMatch[2]}</span>
-        <span className="text-gray-500">{yamlMatch[3]}</span>
-        <span className={valueClass}>{yamlMatch[4]}</span>
+        <span>{m[1]}</span>
+        <span className="text-sky-400">{m[2]}</span>
+        <span className="text-gray-500">{m[3]}</span>
+        {highlightJsonValue(m[4])}
       </>
     );
   }
-  // JSON key
-  const jsonMatch = line.match(/^(\s*)("[\w./-]+")\s*(:)(.*)/);
-  if (jsonMatch) {
+  // Braces / brackets / standalone
+  return <span className="text-gray-300">{line}</span>;
+}
+
+function highlightJsonValue(val) {
+  const trimmed = val.replace(/,\s*$/, '').trim();
+  const tail = val.endsWith(',') ? <span className="text-gray-500">,</span> : null;
+  let cls = 'text-gray-300';
+  if (/^".*"$/.test(trimmed)) cls = 'text-green-300';
+  else if (/^-?\d+(\.\d+)?$/.test(trimmed)) cls = 'text-emerald-400';
+  else if (trimmed === 'true' || trimmed === 'false') cls = 'text-amber-400';
+  else if (trimmed === 'null') cls = 'text-gray-500 italic';
+  return <><span className={cls}>{trimmed}</span>{tail}</>;
+}
+
+function highlightYaml(line) {
+  // list item
+  const dash = line.match(/^(\s*)(-\s+)(.*)$/);
+  if (dash) {
+    return <><span>{dash[1]}</span><span className="text-orange-400">{dash[2]}</span>{highlightYamlScalar(dash[3])}</>;
+  }
+  // key: value
+  const m = line.match(/^(\s*)([\w.-]+)(:\s*)(.*)$/);
+  if (m) {
     return (
       <>
-        <span>{jsonMatch[1]}</span>
-        <span className="text-sky-400">{jsonMatch[2]}</span>
-        <span className="text-gray-500">{jsonMatch[3]}</span>
-        <span className="text-green-300">{jsonMatch[4]}</span>
+        <span>{m[1]}</span>
+        <span className="text-sky-400">{m[2]}</span>
+        <span className="text-gray-500">{m[3]}</span>
+        {highlightYamlScalar(m[4])}
       </>
     );
   }
+  return <span className="text-gray-300">{line}</span>;
+}
+
+function highlightYamlScalar(val) {
+  const trimmed = (val || '').trim();
+  if (!trimmed) return null;
+  let cls = 'text-green-300';
+  if (trimmed === 'true' || trimmed === 'false') cls = 'text-amber-400';
+  else if (/^-?\d+(\.\d+)?$/.test(trimmed)) cls = 'text-emerald-400';
+  else if (trimmed === 'null' || trimmed === '~') cls = 'text-gray-500 italic';
+  else if (/^https?:\/\//.test(trimmed)) cls = 'text-cyan-300';
+  else if (trimmed.startsWith('/')) cls = 'text-purple-300';
+  return <span className={cls}>{trimmed}</span>;
+}
+
+// Plain values: highlight URLs, paths, key=value (env-style), else neutral.
+function highlightPlain(line) {
+  const trimmed = line.trim();
+  if (/^https?:\/\//.test(trimmed)) return <span className="text-cyan-300">{line}</span>;
+  if (/^\//.test(trimmed)) return <span className="text-purple-300">{line}</span>;
+  // env-style KEY=value
+  const kv = line.match(/^([\w.-]+)(=)(.*)$/);
+  if (kv) {
+    return <><span className="text-sky-400">{kv[1]}</span><span className="text-gray-500">{kv[2]}</span><span className="text-green-300">{kv[3]}</span></>;
+  }
+  if (trimmed === 'true' || trimmed === 'false') return <span className="text-amber-400">{line}</span>;
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return <span className="text-emerald-400">{line}</span>;
   return <span className="text-[#e6edf3]">{line}</span>;
 }
