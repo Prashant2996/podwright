@@ -36,6 +36,10 @@ jobs:
       - name: Run Pro license tests
         run: node server/pro.test.js
 
+      - name: Security audit (server)
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
       - name: Install client dependencies
         working-directory: client
         run: npm ci
@@ -43,6 +47,11 @@ jobs:
       - name: Build client
         working-directory: client
         run: npm run build
+
+      - name: Security audit (client)
+        working-directory: client
+        run: npm audit --audit-level=high
+        continue-on-error: true
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
