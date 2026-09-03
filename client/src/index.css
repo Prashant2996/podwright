@@ -108,6 +108,25 @@
     border-left-color: #326CE5 !important;
   }
 
+  /* Sidebar count badges - light background with readable dark text */
+  .light .bg-gray-700\/70 {
+    background-color: #e2e8f0 !important;
+  }
+  .light .bg-gray-700\/70.text-gray-300 {
+    color: #475569 !important;
+  }
+
+  /* Scrollbar in light mode */
+  .light ::-webkit-scrollbar-track {
+    background: #f1f5f9 !important;
+  }
+  .light ::-webkit-scrollbar-thumb {
+    background: #cbd5e1 !important;
+  }
+  .light ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8 !important;
+  }
+
   /* Light mode status badges */
   .light .status-running {
     background-color: #dcfce7 !important;
