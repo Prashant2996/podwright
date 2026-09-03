@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Podwright — Developer-first Kubernetes Dashboard</title>
+  <meta name="description" content="A fast, developer-first Kubernetes dashboard with AI troubleshooting, namespace cleanup automation, and real-time change tracking. Open source, starts in under 3 seconds." />
+  <meta property="og:title" content="Podwright — Kubernetes Dashboard for Developers" />
+  <meta property="og:description" content="AI troubleshooting, cleanup automation, compare/clone. Open source, runs locally." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'k8s-blue': '#326CE5',
+            'k8s-dark': '#1a1a2e',
+            'card': '#1e293b',
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { background: #0f0f1e; }
+  </style>
+</head>
+<body class="text-gray-100 antialiased">
+
+  <!-- Nav -->
+  <nav class="sticky top-0 z-50 backdrop-blur border-b border-gray-800 bg-[#0f0f1e]/80">
+    <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <svg width="28" height="28" viewBox="0 0 64 64" fill="none">
+          <polygon points="32,2 58,17 58,47 32,62 6,47 6,17" fill="#326CE5" stroke="#4a8af4" stroke-width="2"/>
+          <circle cx="32" cy="32" r="8" fill="white"/>
+          <line x1="32" y1="10" x2="32" y2="24" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="32" y1="40" x2="32" y2="54" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="13" y1="21" x2="25" y2="28" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="39" y1="36" x2="51" y2="43" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="13" y1="43" x2="25" y2="36" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="39" y1="28" x2="51" y2="21" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+        <span class="font-bold text-lg">Podwright</span>
+      </div>
+      <div class="flex items-center gap-6 text-sm">
+        <a href="#features" class="text-gray-400 hover:text-white hidden sm:block">Features</a>
+        <a href="#pricing" class="text-gray-400 hover:text-white hidden sm:block">Pricing</a>
+        <a href="https://github.com/Prashant2996/podwright" class="text-gray-400 hover:text-white">GitHub</a>
+        <a href="#pricing" class="bg-k8s-blue hover:bg-blue-600 text-white px-4 py-2 rounded-md font-medium transition-colors">Get Pro</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="max-w-6xl mx-auto px-6 pt-20 pb-16 text-center">
+    <div class="inline-flex items-center gap-2 bg-gray-800/50 border border-gray-700 rounded-full px-3 py-1 text-xs text-gray-400 mb-6">
+      <span class="w-2 h-2 rounded-full bg-green-400"></span>
+      Open source · AGPL-3.0 · Starts in under 3 seconds
+    </div>
+    <h1 class="text-4xl sm:text-6xl font-bold tracking-tight mb-6">
+      The Kubernetes dashboard<br />
+      <span class="text-k8s-blue">built for developers</span>
+    </h1>
+    <p class="text-lg text-gray-400 max-w-2xl mx-auto mb-8">
+      Troubleshoot crashes, clean up namespaces, compare environments, and manage
+      workloads — all in one fast, local dashboard. No database. No agents.
+    </p>
+    <div class="flex items-center justify-center gap-4 flex-wrap">
+      <a href="https://github.com/Prashant2996/podwright" class="bg-k8s-blue hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+        Get Started — Free
+      </a>
+      <a href="#pricing" class="border border-gray-700 hover:border-gray-500 text-gray-200 px-6 py-3 rounded-lg font-medium transition-colors">
+        View Pricing
+      </a>
+    </div>
+    <div class="mt-4 text-xs text-gray-600">
+      <code class="bg-gray-800 px-2 py-1 rounded">git clone · npm run install:all · npm run dev</code>
+    </div>
+
+    <!-- Screenshot -->
+    <div class="mt-14 rounded-xl overflow-hidden border border-gray-800 shadow-2xl max-w-4xl mx-auto">
+      <img src="screenshots/01-overview.png" alt="Podwright dashboard overview" class="w-full" onerror="this.style.display='none'" />
+    </div>
+  </header>
+
+  <!-- Features -->
+  <section id="features" class="max-w-6xl mx-auto px-6 py-20">
+    <h2 class="text-3xl font-bold text-center mb-4">Everything you do daily, in one place</h2>
+    <p class="text-gray-400 text-center mb-14 max-w-xl mx-auto">Podwright focuses on developer workflows instead of trying to be a full cluster-management suite.</p>
+
+    <div class="grid md:grid-cols-3 gap-6">
+      <div class="bg-card border border-gray-800 rounded-xl p-6">
+        <div class="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </div>
+        <h3 class="font-semibold mb-2">AI Troubleshooter</h3>
+        <p class="text-sm text-gray-400">Scans for CrashLoopBackOff, OOMKilled, and ImagePull errors. Pro adds LLM-powered root-cause analysis with concrete fixes.</p>
+      </div>
+      <div class="bg-card border border-gray-800 rounded-xl p-6">
+        <div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </div>
+        <h3 class="font-semibold mb-2">Namespace Cleanup</h3>
+        <p class="text-sm text-gray-400">Permission-based cleanup of completed pods, Helm releases, and orphaned resources. No hardcoded naming rules.</p>
+      </div>
+      <div class="bg-card border border-gray-800 rounded-xl p-6">
+        <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+        </div>
+        <h3 class="font-semibold mb-2">Compare &amp; Clone</h3>
+        <p class="text-sm text-gray-400">Diff deployments and ConfigMaps across namespaces, then clone stateless services between environments.</p>
+      </div>
+      <div class="bg-card border border-gray-800 rounded-xl p-6">
+        <div class="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+        </div>
+        <h3 class="font-semibold mb-2">Logs &amp; Terminal</h3>
+        <p class="text-sm text-gray-400">Stream logs, exec into containers, view events and health — all without leaving the dashboard.</p>
+      </div>
+      <div class="bg-card border border-gray-800 rounded-xl p-6">
+        <div class="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </div>
+        <h3 class="font-semibold mb-2">Real-time Events</h3>
+        <p class="text-sm text-gray-400">Track deployment tag changes and pod crash spikes as they happen, with optional browser notifications.</p>
+      </div>
+      <div class="bg-card border border-gray-800 rounded-xl p-6">
+        <div class="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        </div>
+        <h3 class="font-semibold mb-2">RBAC-aware</h3>
+        <p class="text-sm text-gray-400">See exactly what your user can do in each namespace with a visual permissions matrix. Uses your local kubeconfig.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section id="pricing" class="max-w-5xl mx-auto px-6 py-20">
+    <h2 class="text-3xl font-bold text-center mb-4">Simple pricing</h2>
+    <p class="text-gray-400 text-center mb-14">Start free. Upgrade when you want AI-powered troubleshooting.</p>
+
+    <div class="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+      <!-- Free -->
+      <div class="bg-card border border-gray-800 rounded-xl p-8">
+        <h3 class="text-lg font-semibold mb-1">Community</h3>
+        <p class="text-sm text-gray-500 mb-4">Everything you need for daily K8s work.</p>
+        <div class="text-4xl font-bold mb-6">$0</div>
+        <ul class="space-y-3 text-sm text-gray-300 mb-8">
+          <li class="flex gap-2"><span class="text-green-400">&check;</span> Full dashboard &amp; workload management</li>
+          <li class="flex gap-2"><span class="text-green-400">&check;</span> Logs, terminal, events, health</li>
+          <li class="flex gap-2"><span class="text-green-400">&check;</span> Rule-based troubleshooter</li>
+          <li class="flex gap-2"><span class="text-green-400">&check;</span> Namespace cleanup &amp; compare</li>
+          <li class="flex gap-2"><span class="text-green-400">&check;</span> Multi-cluster, port-forward, apply YAML</li>
+          <li class="flex gap-2"><span class="text-green-400">&check;</span> Self-hosted, open source</li>
+        </ul>
+        <a href="https://github.com/Prashant2996/podwright" class="block text-center border border-gray-700 hover:border-gray-500 rounded-lg py-3 font-medium transition-colors">
+          Download on GitHub
+        </a>
+      </div>
+
+      <!-- Pro -->
+      <div class="bg-card border-2 border-k8s-blue rounded-xl p-8 relative">
+        <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-k8s-blue text-white text-xs font-medium px-3 py-1 rounded-full">Most Popular</div>
+        <h3 class="text-lg font-semibold mb-1">Pro</h3>
+        <p class="text-sm text-gray-500 mb-4">AI-powered troubleshooting &amp; more.</p>
+        <div class="text-4xl font-bold mb-1">$9<span class="text-base text-gray-500 font-normal">/month</span></div>
+        <p class="text-xs text-gray-600 mb-6">per developer, billed monthly</p>
+        <ul class="space-y-3 text-sm text-gray-300 mb-8">
+          <li class="flex gap-2"><span class="text-k8s-blue">&check;</span> Everything in Community</li>
+          <li class="flex gap-2"><span class="text-k8s-blue">&check;</span> <strong>AI Troubleshooter</strong> (LLM root-cause analysis)</li>
+          <li class="flex gap-2"><span class="text-k8s-blue">&check;</span> Bring your own OpenAI / Claude key</li>
+          <li class="flex gap-2"><span class="text-k8s-blue">&check;</span> Priority support</li>
+          <li class="flex gap-2"><span class="text-k8s-blue">&check;</span> Early access to new features</li>
+        </ul>
+        <!-- Replace href with your Stripe Payment Link when ready -->
+        <a href="STRIPE_PAYMENT_LINK" id="buy-pro" class="block text-center bg-k8s-blue hover:bg-blue-600 text-white rounded-lg py-3 font-medium transition-colors">
+          Get Pro
+        </a>
+      </div>
+    </div>
+
+    <p class="text-center text-xs text-gray-600 mt-8">
+      Need SSO, audit logs, or team management? <a href="mailto:prashant.gupta9296@gmail.com" class="text-k8s-blue hover:underline">Contact us about Enterprise.</a>
+    </p>
+  </section>
+
+  <!-- CTA -->
+  <section class="max-w-3xl mx-auto px-6 py-16 text-center">
+    <h2 class="text-2xl font-bold mb-4">Try Podwright in 30 seconds</h2>
+    <div class="bg-gray-900 border border-gray-800 rounded-lg p-4 text-left inline-block">
+      <code class="text-sm text-green-400">
+        git clone https://github.com/Prashant2996/podwright<br />
+        cd podwright &amp;&amp; npm run install:all<br />
+        npm run dev
+      </code>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-800 mt-10">
+    <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+      <span>&copy; 2026 Podwright. AGPL-3.0.</span>
+      <div class="flex gap-6">
+        <a href="https://github.com/Prashant2996/podwright" class="hover:text-white">GitHub</a>
+        <a href="https://github.com/Prashant2996/podwright/issues" class="hover:text-white">Issues</a>
+        <a href="#pricing" class="hover:text-white">Pricing</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

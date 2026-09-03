@@ -13,7 +13,7 @@ Thanks for your interest in contributing to Podwright! This document provides gu
    ```bash
    npm run dev
    ```
-4. Open http://localhost:5173 in your browser
+4. Open http://localhost:7071 in your browser
 
 ## Prerequisites
 

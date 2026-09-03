@@ -8,9 +8,10 @@ const os = require('os');
 const k8s = require('@kubernetes/client-node');
 const path = require('path');
 const deploymentEvents = require('./deploymentEvents');
+const pro = require('./pro');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 7070;
 
 app.use(cors());
 app.use(express.json());
@@ -1647,68 +1648,82 @@ app.get('/api/cleanup/job/:jobId', (req, res) => {
 });
 
 // --- AI Kubernetes Troubleshooter ---
-app.get('/api/troubleshoot/:namespace/:podName', async (req, res) => {
-  const { namespace, podName } = req.params;
 
-  try {
-    // Gather all diagnostic data
-    const [pod, events] = await Promise.all([
-      k8sApi.readNamespacedPod({ name: podName, namespace }),
-      k8sApi.listNamespacedEvent({namespace, fieldSelector: `involvedObject.name=${podName},involvedObject.kind=Pod`}),
-    ]);
+// Shared diagnostic gatherer used by both the free (rule-based) endpoint and
+// the Pro (LLM-powered) endpoint. Returns pod info, rule-based diagnosis,
+// raw data, and collected logs.
+async function getPodDiagnostics(namespace, podName) {
+  validateNames(namespace, podName);
 
-    const containerStatuses = pod.status?.containerStatuses || [];
-    const conditions = pod.status?.conditions || [];
-    const containers = pod.spec?.containers || [];
-    const eventList = (events.items || []).sort((a, b) => 
-      new Date(b.lastTimestamp || b.metadata.creationTimestamp) - new Date(a.lastTimestamp || a.metadata.creationTimestamp)
-    );
+  const [pod, events] = await Promise.all([
+    k8sApi.readNamespacedPod({ name: podName, namespace }),
+    k8sApi.listNamespacedEvent({ namespace, fieldSelector: `involvedObject.name=${podName},involvedObject.kind=Pod` }),
+  ]);
 
-    // Collect logs from crashing containers (last 50 lines)
-    const containerLogs = {};
-    for (const cs of containerStatuses) {
-      if (cs.restartCount > 0 || cs.state?.waiting || cs.state?.terminated) {
-        try {
-          const logResult = await k8sApi.readNamespacedPodLog({name: podName, namespace, container: cs.name, previous: true, tailLines: 50});
-          containerLogs[cs.name] = { previous: logResult || '' };
-        } catch (e) {
-          containerLogs[cs.name] = { previous: '' };
-        }
-        try {
-          const logResult = await k8sApi.readNamespacedPodLog({name: podName, namespace, container: cs.name, tailLines: 50});
-          containerLogs[cs.name] = { ...containerLogs[cs.name], current: logResult || '' };
-        } catch (e) {
-          containerLogs[cs.name] = { ...containerLogs[cs.name], current: '' };
-        }
+  const containerStatuses = pod.status?.containerStatuses || [];
+  const conditions = pod.status?.conditions || [];
+  const containers = pod.spec?.containers || [];
+  const eventList = (events.items || []).sort((a, b) =>
+    new Date(b.lastTimestamp || b.metadata.creationTimestamp) - new Date(a.lastTimestamp || a.metadata.creationTimestamp)
+  );
+
+  // Collect logs from crashing containers (last 50 lines)
+  const containerLogs = {};
+  let combinedLogs = '';
+  for (const cs of containerStatuses) {
+    if (cs.restartCount > 0 || cs.state?.waiting || cs.state?.terminated) {
+      try {
+        const prev = await k8sApi.readNamespacedPodLog({ name: podName, namespace, container: cs.name, previous: true, tailLines: 50 });
+        containerLogs[cs.name] = { previous: prev || '' };
+        if (prev) combinedLogs += `[${cs.name} previous]\n${prev}\n`;
+      } catch (e) {
+        containerLogs[cs.name] = { previous: '' };
+      }
+      try {
+        const cur = await k8sApi.readNamespacedPodLog({ name: podName, namespace, container: cs.name, tailLines: 50 });
+        containerLogs[cs.name] = { ...containerLogs[cs.name], current: cur || '' };
+        if (cur) combinedLogs += `[${cs.name} current]\n${cur}\n`;
+      } catch (e) {
+        containerLogs[cs.name] = { ...containerLogs[cs.name], current: '' };
       }
     }
+  }
 
-    // Analyze and generate diagnosis
-    const diagnosis = analyzePod(pod, containerStatuses, containers, eventList, containerLogs, conditions);
+  const diagnosis = analyzePod(pod, containerStatuses, containers, eventList, containerLogs, conditions);
 
-    res.json({
-      pod: podName,
-      namespace,
-      phase: pod.status?.phase,
-      diagnosis,
-      rawData: {
-        containerStatuses: containerStatuses.map(cs => ({
-          name: cs.name,
-          ready: cs.ready,
-          restartCount: cs.restartCount,
-          state: cs.state,
-          lastState: cs.lastState,
-        })),
-        recentEvents: eventList.slice(0, 10).map(e => ({
-          type: e.type,
-          reason: e.reason,
-          message: e.message,
-          count: e.count,
-          lastTimestamp: e.lastTimestamp,
-        })),
-        conditions,
-      },
-    });
+  return {
+    pod: podName,
+    namespace,
+    phase: pod.status?.phase,
+    diagnosis,
+    logs: combinedLogs.slice(0, 6000), // cap for LLM token budget
+    rawData: {
+      containerStatuses: containerStatuses.map(cs => ({
+        name: cs.name,
+        ready: cs.ready,
+        restartCount: cs.restartCount,
+        state: cs.state,
+        lastState: cs.lastState,
+      })),
+      recentEvents: eventList.slice(0, 10).map(e => ({
+        type: e.type,
+        reason: e.reason,
+        message: e.message,
+        count: e.count,
+        lastTimestamp: e.lastTimestamp,
+      })),
+      conditions,
+    },
+  };
+}
+
+app.get('/api/troubleshoot/:namespace/:podName', async (req, res) => {
+  const { namespace, podName } = req.params;
+  try {
+    const result = await getPodDiagnostics(namespace, podName);
+    // Free endpoint omits the raw combined logs from the response payload
+    const { logs, ...rest } = result;
+    res.json(rest);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -2308,6 +2323,11 @@ function formatPod(p) {
   };
 }
 
+// --- Register modular routes (must be before the production catch-all) ---
+deploymentEvents.init({ wss, appsApi, coreApi: k8sApi, k8sPatch });
+deploymentEvents.registerRoutes(app);
+pro.registerRoutes(app, { getPodDiagnostics });
+
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, '..', 'client', 'dist');
@@ -2320,10 +2340,6 @@ if (process.env.NODE_ENV === 'production') {
 // --- Initialize and Start ---
 async function start() {
   await detectIdentity();
-  
-  // Initialize deployment events module
-  deploymentEvents.init({ wss, appsApi, coreApi: k8sApi, k8sPatch });
-  deploymentEvents.registerRoutes(app);
 
   server.listen(PORT, () => {
     console.log(`Podwright server running on http://localhost:${PORT}`);

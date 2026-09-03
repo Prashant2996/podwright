@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { useToast } from '../components/Toast';
+import { usePro } from '../hooks/usePro';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import StatusBadge from '../components/StatusBadge';
 
@@ -11,7 +12,39 @@ export default function Troubleshoot({ namespace }) {
   const [selectedPod, setSelectedPod] = useState(null);
   const [podDiagnosis, setPodDiagnosis] = useState(null);
   const [diagnosing, setDiagnosing] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const { addToast } = useToast();
+  const { licensed, hasLlmKey, llmProvider, llmApiKey, llmModel } = usePro();
+
+  const runAiAnalysis = async (podName) => {
+    if (!licensed) {
+      addToast('AI analysis requires Podwright Pro', 'error');
+      return;
+    }
+    if (!hasLlmKey) {
+      addToast('Add your LLM API key in Podwright Pro settings first', 'error');
+      return;
+    }
+    setAiLoading(true);
+    setAiAnalysis(null);
+    try {
+      const res = await fetch(`/api/pro/troubleshoot/${namespace}/${podName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: llmProvider, apiKey: llmApiKey, model: llmModel || undefined }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAiAnalysis(data.analysis);
+      } else {
+        addToast(data.error || 'AI analysis failed', 'error');
+      }
+    } catch (e) {
+      addToast('AI analysis failed: ' + e.message, 'error');
+    }
+    setAiLoading(false);
+  };
 
   const handleScan = async () => {
     if (!namespace) {
@@ -39,6 +72,7 @@ export default function Troubleshoot({ namespace }) {
     setSelectedPod(podName);
     setDiagnosing(true);
     setPodDiagnosis(null);
+    setAiAnalysis(null);
     try {
       const res = await fetch(`/api/troubleshoot/${namespace}/${podName}`);
       const data = await res.json();
@@ -258,6 +292,64 @@ export default function Troubleshoot({ namespace }) {
                   </div>
                 </div>
               )}
+
+              {/* AI Deep Analysis (Pro) */}
+              <div className="border-t border-gray-700/50 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <h4 className="text-xs font-medium text-white uppercase">AI Deep Analysis</h4>
+                    <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">Pro</span>
+                  </div>
+                  {licensed && hasLlmKey && (
+                    <button
+                      onClick={() => runAiAnalysis(podDiagnosis.pod)}
+                      disabled={aiLoading}
+                      className="btn-primary btn-sm text-xs disabled:opacity-50"
+                    >
+                      {aiLoading ? 'Analyzing...' : 'Run AI Analysis'}
+                    </button>
+                  )}
+                </div>
+
+                {!licensed && (
+                  <div className="bg-purple-500/5 border border-purple-500/30 rounded-lg p-4 text-center">
+                    <p className="text-sm text-gray-300 mb-2">
+                      Get LLM-powered root-cause analysis with concrete fix suggestions.
+                    </p>
+                    <Link to="/pro" className="btn-primary btn-sm text-xs inline-block">
+                      Upgrade to Pro
+                    </Link>
+                  </div>
+                )}
+
+                {licensed && !hasLlmKey && (
+                  <div className="bg-yellow-500/5 border border-yellow-500/30 rounded-lg p-3">
+                    <p className="text-xs text-yellow-300">
+                      Add your LLM API key in{' '}
+                      <Link to="/pro" className="underline">Podwright Pro settings</Link>{' '}
+                      to enable AI analysis.
+                    </p>
+                  </div>
+                )}
+
+                {aiLoading && (
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <svg className="w-4 h-4 animate-spin text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Consulting the model...
+                  </div>
+                )}
+
+                {aiAnalysis && (
+                  <div className="bg-gray-900 rounded-lg p-4">
+                    <pre className="text-xs text-gray-200 whitespace-pre-wrap font-sans leading-relaxed">{aiAnalysis}</pre>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

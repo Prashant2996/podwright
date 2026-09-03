@@ -58,8 +58,8 @@ npm run dev
 ```
 
 This starts:
-- Backend API server on http://localhost:3001
-- Frontend dev server on http://localhost:5173
+- Backend API server on http://localhost:7070
+- Frontend dev server on http://localhost:7071
 
 ## Prerequisites
 
@@ -85,8 +85,19 @@ Podwright uses your local kubeconfig automatically:
 
 ```bash
 docker build -t podwright .
-docker run -p 3001:3001 -v ~/.kube:/root/.kube:ro podwright
+docker run -p 7070:7070 -v ~/.kube:/root/.kube:ro podwright
 ```
+
+## Podwright Pro
+
+The free tier includes the full dashboard and a rule-based troubleshooter.
+**Podwright Pro** adds LLM-powered troubleshooting — deep root-cause analysis
+with concrete fix suggestions, using your own OpenAI or Anthropic API key
+(bring-your-own-key).
+
+- Activate via **Podwright Pro** in the sidebar with a license key
+- Set up payments: see [STRIPE-SETUP.md](STRIPE-SETUP.md)
+- Landing page: see [website/](website/)
 
 ## Contributing
 

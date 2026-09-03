@@ -5,6 +5,7 @@ import App from './App';
 import { ThemeProvider } from './hooks/useTheme';
 import { AutoRefreshProvider } from './hooks/useAutoRefresh';
 import { DeploymentEventsProvider } from './hooks/useDeploymentEvents';
+import { ProProvider } from './hooks/usePro';
 import { ToastProvider } from './components/Toast';
 import { ConfirmProvider } from './components/ConfirmModal';
 import './index.css';
@@ -15,11 +16,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <ThemeProvider>
         <AutoRefreshProvider>
           <DeploymentEventsProvider>
-            <ToastProvider>
-              <ConfirmProvider>
-                <App />
-              </ConfirmProvider>
-            </ToastProvider>
+            <ProProvider>
+              <ToastProvider>
+                <ConfirmProvider>
+                  <App />
+                </ConfirmProvider>
+              </ToastProvider>
+            </ProProvider>
           </DeploymentEventsProvider>
         </AutoRefreshProvider>
       </ThemeProvider>

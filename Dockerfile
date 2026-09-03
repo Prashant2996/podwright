@@ -35,7 +35,7 @@ RUN npm ci --production
 COPY server ./server
 COPY --from=build /app/client/dist ./client/dist
 
-EXPOSE 3001
+EXPOSE 7070
 
 ENV NODE_ENV=production
 

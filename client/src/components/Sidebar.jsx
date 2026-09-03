@@ -25,6 +25,7 @@ import {
   CommandLineIcon,
   ShieldCheckIcon,
   SparklesIcon,
+  StarIcon,
 } from '@heroicons/react/24/outline';
 import { useAutoRefreshControls } from '../hooks/useAutoRefresh';
 
@@ -79,6 +80,12 @@ const navSections = [
       { path: '/apply', label: 'Apply YAML', icon: CommandLineIcon, countKey: null },
       { path: '/rbac', label: 'RBAC', icon: ShieldCheckIcon, countKey: null },
       { path: '/cleanup', label: 'NS Cleanup', icon: TrashIcon, countKey: null },
+    ],
+  },
+  {
+    title: 'Account',
+    items: [
+      { path: '/pro', label: 'Podwright Pro', icon: StarIcon, countKey: null },
     ],
   },
 ];

@@ -27,6 +27,7 @@ import PortForward from './pages/PortForward';
 import ApplyYaml from './pages/ApplyYaml';
 import RBAC from './pages/RBAC';
 import Troubleshoot from './pages/Troubleshoot';
+import ProSettings from './pages/ProSettings';
 
 function BackendDown({ onRetry, error }) {
   const isClusterError = error && !error.includes('Failed to fetch') && !error.includes('NetworkError');
@@ -153,6 +154,7 @@ export default function App() {
               <Route path="/apply" element={<ApplyYaml namespace={namespace} />} />
               <Route path="/rbac" element={<RBAC namespace={namespace} />} />
               <Route path="/troubleshoot" element={<Troubleshoot namespace={namespace} />} />
+              <Route path="/pro" element={<ProSettings />} />
             </Routes>
           </ErrorBoundary>
         </main>

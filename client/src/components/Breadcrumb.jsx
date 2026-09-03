@@ -22,6 +22,7 @@ const routeLabels = {
   apply: 'Apply YAML',
   rbac: 'RBAC Permissions',
   cleanup: 'Namespace Cleanup',
+  pro: 'Podwright Pro',
 };
 
 export default function Breadcrumb() {

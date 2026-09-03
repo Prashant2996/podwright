@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Podwright Pro** tier with LLM-powered troubleshooter (OpenAI / Anthropic,
+  bring-your-own-key). Gated behind a license key.
+- License key system (`server/pro.js`) with activation UI (`/pro` page).
+- Standalone Stripe fulfillment service (`fulfillment/`) that issues license
+  keys on payment and emails them to customers.
+- Marketing landing page (`website/`) with pricing.
+- Configurable ports (backend 7070, frontend 7071) to avoid conflicts with
+  common dev-server ports.
+
 ### Security
 - Removed command-injection surface in namespace cleanup: the client now sends
   typed actions instead of raw shell commands; the server executes a fixed

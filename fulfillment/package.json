@@ -1,0 +1,15 @@
+{
+  "name": "podwright-fulfillment",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Stripe webhook -> license key fulfillment for Podwright Pro",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "stripe": "^17.0.0",
+    "nodemailer": "^6.9.0"
+  }
+}
