@@ -34,6 +34,14 @@ export function AutoRefreshProvider({ children }) {
     return () => window.clearInterval(timer);
   }, [enabled, interval]);
 
+  // Manual refresh: bump the tick so all useAutoRefresh consumers re-fetch,
+  // and briefly show the refreshing indicator.
+  const refreshNow = useCallback(() => {
+    setTick(t => t + 1);
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
+
   const value = {
     enabled,
     setEnabled,
@@ -41,6 +49,7 @@ export function AutoRefreshProvider({ children }) {
     setInterval: setIntervalValue,
     tick,
     refreshing,
+    refreshNow,
   };
 
   return (

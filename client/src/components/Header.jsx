@@ -9,7 +9,7 @@ import Breadcrumb from './Breadcrumb';
 
 export default function Header({ namespace, setNamespace, namespaces }) {
   const { theme, toggle } = useTheme();
-  const { enabled, setEnabled, interval, setInterval, refreshing } = useAutoRefreshControls();
+  const { enabled, setEnabled, interval, setInterval, refreshing, refreshNow } = useAutoRefreshControls();
   const { addSearch, getTopPredictions } = useSearchHistory();
   const navigate = useNavigate();
   const location = useLocation();
@@ -362,15 +362,20 @@ export default function Header({ namespace, setNamespace, namespaces }) {
 
         {/* Auto-refresh controls */}
         <div className="flex items-center gap-2">
-          {refreshing && (
-            <svg className="w-4 h-4 text-k8s-blue animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          {/* Manual refresh button */}
+          <button
+            onClick={refreshNow}
+            title="Refresh now"
+            className="p-1.5 rounded-md hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
+          >
+            <svg className={`w-4 h-4 ${refreshing ? 'animate-spin text-k8s-blue' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-          )}
+          </button>
           {enabled && !refreshing && (
-            <span className="w-2 h-2 bg-green-400 rounded-full" />
+            <span className="w-2 h-2 bg-green-400 rounded-full" title="Auto-refresh on" />
           )}
-          <label className="relative inline-flex items-center cursor-pointer">
+          <label className="relative inline-flex items-center cursor-pointer" title="Toggle auto-refresh">
             <input
               type="checkbox"
               checked={enabled}

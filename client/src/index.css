@@ -150,6 +150,16 @@
   .light .text-cyan-400 { color: #0891b2 !important; }
   .light .text-pink-400 { color: #db2777 !important; }
 
+  /* Log viewer adapts to light mode: light surface, dark readable text */
+  .light .log-viewer {
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0;
+  }
+  .light .log-viewer .text-gray-500 {
+    color: #64748b !important;
+  }
+
   /* Scrollbar in light mode */
   .light ::-webkit-scrollbar-track {
     background: #f1f5f9 !important;

@@ -35,6 +35,7 @@ export default function NamespaceCleanup({ namespace, namespaces }) {
   const [useRbac, setUseRbac] = useState(getUseRbac);
   const [hasDeleteAccess, setHasDeleteAccess] = useState(null);
   const [checkingAccess, setCheckingAccess] = useState(false);
+  const [serviceName, setServiceName] = useState('');
   const pollRef = useRef(null);
   const { addToast } = useToast();
   const confirm = useConfirm();
@@ -324,6 +325,52 @@ export default function NamespaceCleanup({ namespace, namespaces }) {
               </div>
             </div>
           )}
+
+          {/* Single-service cleanup */}
+          <div className="card p-4 border-orange-500/30 bg-orange-500/5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-orange-400">Clean Up a Single Service</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Delete everything tied to one service: its deployment, service, ingress, HPA,
+                  configmaps, secrets, PVCs, and any Helm release. Matches by name and by the
+                  <code className="mx-1 px-1 rounded bg-gray-800 text-gray-300">app=&lt;name&gt;</code>
+                  label. This is destructive and cannot be undone.
+                </p>
+                <div className="flex items-center gap-2 mt-3">
+                  <input
+                    type="text"
+                    value={serviceName}
+                    onChange={e => setServiceName(e.target.value)}
+                    placeholder="service name (e.g. checkout-api)"
+                    className="input text-sm flex-1 max-w-xs"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && serviceName.trim()) {
+                        executeCleanup(
+                          [{ name: `Clean up service "${serviceName.trim()}"`, type: 'cleanup-service', params: { service: serviceName.trim() } }],
+                          `Delete ALL resources for service "${serviceName.trim()}" in ${namespace} (deployment, service, ingress, HPA, configmaps, secrets, PVCs, Helm release)`
+                        );
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      const svc = serviceName.trim();
+                      if (!svc) return;
+                      executeCleanup(
+                        [{ name: `Clean up service "${svc}"`, type: 'cleanup-service', params: { service: svc } }],
+                        `Delete ALL resources for service "${svc}" in ${namespace} (deployment, service, ingress, HPA, configmaps, secrets, PVCs, Helm release)`
+                      );
+                    }}
+                    disabled={!serviceName.trim()}
+                    className="btn-danger btn-sm disabled:opacity-50"
+                  >
+                    Clean Service
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Full Cleanup */}
           <div className="card p-4 border-red-500/30 bg-red-500/5">

@@ -14,7 +14,9 @@ const app = express();
 const PORT = process.env.PORT || 7070;
 
 app.use(cors());
-app.use(express.json());
+// K8s ConfigMaps/Secrets can be up to ~1MB; allow a comfortable margin for
+// the JSON envelope so large-file edits save correctly.
+app.use(express.json({ limit: '4mb' }));
 
 // --- Kubernetes Client Setup ---
 const kc = new k8s.KubeConfig();
@@ -166,8 +168,18 @@ async function k8sPatch(resourcePath, body, patchType = 'strategic-merge-patch')
 
   const response = await httpsPatch(url, fetchOptions, agent);
   if (!response.ok) {
-    // Do not leak raw upstream error bodies to the client
-    throw new Error(`PATCH failed with status ${response.status}`);
+    // Do not leak raw upstream error bodies to the client, but surface a
+    // helpful hint for common, actionable cases.
+    if (response.status === 413) {
+      throw new Error('Resource too large. Kubernetes limits ConfigMaps/Secrets to ~1MB.');
+    }
+    if (response.status === 403) {
+      throw new Error('Permission denied (403). Your user cannot perform this action.');
+    }
+    if (response.status === 409) {
+      throw new Error('Conflict (409). The resource changed since it was loaded. Reload and retry.');
+    }
+    throw new Error(`Request failed with status ${response.status}`);
   }
   return response.data;
 }
@@ -245,6 +257,35 @@ const CLEANUP_ACTIONS = {
     validateNames(params.release);
     const out = await execFileAsync('helm', ['uninstall', params.release, '-n', ns]);
     return out.trim() || `Uninstalled ${params.release}`;
+  },
+  // Delete everything associated with a single service: the deployment, service,
+  // ingress, HPA, configmaps, secrets, and PVCs that share the service's name
+  // OR carry the label app=<service>. Safe: uses --ignore-not-found so missing
+  // resources don't error.
+  'cleanup-service': async (ns, params) => {
+    validateNames(params.service);
+    const svc = params.service;
+    const results = [];
+
+    // Resource kinds matched by exact name
+    const byName = ['deployment', 'service', 'ingress', 'horizontalpodautoscaler', 'configmap', 'secret', 'serviceaccount'];
+    for (const kind of byName) {
+      const out = await execFileAsync('kubectl', ['delete', kind, svc, '-n', ns, '--ignore-not-found']);
+      if (out.trim()) results.push(out.trim());
+    }
+
+    // Resource kinds matched by label app=<service> (catches related resources
+    // with hashed/suffixed names)
+    const byLabel = ['deployment', 'service', 'ingress', 'configmap', 'secret', 'pod', 'replicaset', 'horizontalpodautoscaler', 'persistentvolumeclaim'];
+    for (const kind of byLabel) {
+      const out = await execFileAsync('kubectl', ['delete', kind, '-l', `app=${svc}`, '-n', ns, '--ignore-not-found']);
+      if (out.trim()) results.push(out.trim());
+    }
+
+    // Try Helm uninstall if a release with this name exists (best-effort)
+    await execFileAsync('helm', ['uninstall', svc, '-n', ns]);
+
+    return results.length ? results.join('; ') : `Removed resources for "${svc}"`;
   },
 };
 

@@ -141,7 +141,7 @@ export default function LogViewer({ namespace, podName, container }) {
 
       <div
         ref={logRef}
-        className="bg-gray-900 rounded-lg p-4 font-mono text-xs leading-5 text-gray-200 overflow-auto whitespace-pre-wrap min-h-[400px] max-h-[600px]"
+        className="log-viewer bg-gray-900 rounded-lg p-4 font-mono text-xs leading-5 text-gray-200 overflow-auto whitespace-pre-wrap min-h-[400px] max-h-[600px]"
       >
         {logs || <span className="text-gray-500 italic">No logs available</span>}
       </div>
