@@ -17,13 +17,29 @@ function timeAgo(timestamp) {
 export default function Nodes() {
   const [loading, setLoading] = useState(true);
   const [nodes, setNodes] = useState([]);
+  const [metrics, setMetrics] = useState({}); // name -> { cpuMillicores, memoryMiB }
   const [viewResource, setViewResource] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch('/api/nodes');
-      const data = await res.json();
+      const [nodesRes, metricsRes] = await Promise.all([
+        fetch('/api/nodes'),
+        fetch('/api/metrics/nodes').catch(() => null),
+      ]);
+      const data = await nodesRes.json();
       setNodes(Array.isArray(data) ? data : []);
+      if (metricsRes && metricsRes.ok) {
+        const m = await metricsRes.json();
+        if (m.available) {
+          const byName = {};
+          for (const n of m.nodes || []) byName[n.name] = n;
+          setMetrics(byName);
+        } else {
+          setMetrics({});
+        }
+      } else {
+        setMetrics({});
+      }
     } catch (e) {}
     setLoading(false);
   }, []);
@@ -37,8 +53,24 @@ export default function Nodes() {
     { header: 'Status', accessor: 'status', render: (row) => <StatusBadge status={row.status} /> },
     { header: 'Roles', accessor: 'roles' },
     { header: 'Version', accessor: 'version', render: (row) => <span className="font-mono text-xs text-gray-400">{row.version}</span> },
-    { header: 'CPU', accessor: 'cpu' },
-    { header: 'Memory', accessor: 'memory' },
+    { header: 'CPU (cap)', accessor: 'cpu' },
+    { header: 'Memory (cap)', accessor: 'memory' },
+    {
+      header: 'CPU (used)',
+      accessor: 'cpuUsed',
+      render: (row) => {
+        const m = metrics[row.name];
+        return <span className="text-xs text-gray-300">{m ? `${m.cpuMillicores}m` : '-'}</span>;
+      },
+    },
+    {
+      header: 'Mem (used)',
+      accessor: 'memUsed',
+      render: (row) => {
+        const m = metrics[row.name];
+        return <span className="text-xs text-gray-300">{m ? `${m.memoryMiB}Mi` : '-'}</span>;
+      },
+    },
     { header: 'OS', accessor: 'os', render: (row) => <span className="text-xs text-gray-400 truncate block max-w-[150px]">{row.os}</span> },
     { header: 'Age', accessor: 'age', render: (row) => <span className="text-gray-500 text-xs">{timeAgo(row.age)}</span> },
   ];

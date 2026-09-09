@@ -2349,6 +2349,82 @@ app.get('/api/crds', async (req, res) => {
   }
 });
 
+// --- Metrics (metrics.k8s.io, requires metrics-server) ---
+// Parse a Kubernetes quantity for CPU (cores) into millicores.
+function cpuToMillicores(v) {
+  if (!v) return 0;
+  if (v.endsWith('n')) return Math.round(parseInt(v) / 1e6);   // nanocores
+  if (v.endsWith('u')) return Math.round(parseInt(v) / 1e3);   // microcores
+  if (v.endsWith('m')) return parseInt(v);                     // millicores
+  return Math.round(parseFloat(v) * 1000);                     // cores
+}
+
+// Parse a memory quantity into MiB.
+function memToMiB(v) {
+  if (!v) return 0;
+  const units = { Ki: 1 / 1024, Mi: 1, Gi: 1024, Ti: 1024 * 1024, K: 1000 / (1024 * 1024), M: 1 / 1.048576, G: 1024 / 1.048576 };
+  const m = String(v).match(/^(\d+(?:\.\d+)?)([A-Za-z]+)?$/);
+  if (!m) return 0;
+  const num = parseFloat(m[1]);
+  const unit = m[2];
+  if (!unit) return Math.round(num / (1024 * 1024)); // plain bytes
+  return Math.round(num * (units[unit] || 0));
+}
+
+// Query the metrics API via kubectl --raw and return { available, ...data }.
+async function fetchMetricsRaw(path) {
+  const { code, stdout, stderr } = await kubectlCapture(['get', '--raw', path]);
+  if (code !== 0) {
+    const s = (stderr || '').toLowerCase();
+    if (s.includes('not found') || s.includes('the server could not find') || s.includes('metrics') ) {
+      return { available: false, error: 'metrics-server not available' };
+    }
+    return { available: false, error: stderr.trim() || 'metrics query failed' };
+  }
+  return { available: true, data: JSON.parse(stdout) };
+}
+
+// Node metrics: CPU (millicores) + memory (MiB) per node.
+app.get('/api/metrics/nodes', async (req, res) => {
+  try {
+    const result = await fetchMetricsRaw('/apis/metrics.k8s.io/v1beta1/nodes');
+    if (!result.available) {
+      return res.status(503).json({ available: false, error: result.error });
+    }
+    const nodes = (result.data.items || []).map(n => ({
+      name: n.metadata.name,
+      cpuMillicores: cpuToMillicores(n.usage?.cpu),
+      memoryMiB: memToMiB(n.usage?.memory),
+    }));
+    res.json({ available: true, nodes });
+  } catch (e) {
+    res.status(500).json({ available: false, error: e.message });
+  }
+});
+
+// Pod metrics for a namespace: CPU + memory per pod (summed across containers).
+app.get('/api/metrics/pods/:namespace', async (req, res) => {
+  const { namespace } = req.params;
+  try {
+    validateNames(namespace);
+    const result = await fetchMetricsRaw(`/apis/metrics.k8s.io/v1beta1/namespaces/${namespace}/pods`);
+    if (!result.available) {
+      return res.status(503).json({ available: false, error: result.error });
+    }
+    const pods = (result.data.items || []).map(p => {
+      let cpu = 0, mem = 0;
+      for (const c of p.containers || []) {
+        cpu += cpuToMillicores(c.usage?.cpu);
+        mem += memToMiB(c.usage?.memory);
+      }
+      return { name: p.metadata.name, cpuMillicores: cpu, memoryMiB: mem };
+    });
+    res.json({ available: true, pods });
+  } catch (e) {
+    res.status(500).json({ available: false, error: e.message });
+  }
+});
+
 // List instances of a given custom resource type. :crd is the plural.group
 // selector (e.g. "widgets.demo.podwright.in"). namespace optional (omit for
 // cluster-scoped CRDs).

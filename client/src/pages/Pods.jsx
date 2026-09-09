@@ -20,15 +20,32 @@ function timeAgo(timestamp) {
 export default function Pods({ namespace }) {
   const [loading, setLoading] = useState(true);
   const [pods, setPods] = useState([]);
+  const [metrics, setMetrics] = useState({}); // name -> { cpuMillicores, memoryMiB }
   const { addToast } = useToast();
   const confirm = useConfirm();
 
   const fetchData = useCallback(async () => {
     if (!namespace) return;
     try {
-      const res = await fetch(`/api/pods/${namespace}`);
-      const data = await res.json();
+      const [podsRes, metricsRes] = await Promise.all([
+        fetch(`/api/pods/${namespace}`),
+        // Metrics are optional (requires metrics-server); ignore failures.
+        fetch(`/api/metrics/pods/${namespace}`).catch(() => null),
+      ]);
+      const data = await podsRes.json();
       setPods(Array.isArray(data) ? data : []);
+      if (metricsRes && metricsRes.ok) {
+        const m = await metricsRes.json();
+        if (m.available) {
+          const byName = {};
+          for (const p of m.pods || []) byName[p.name] = p;
+          setMetrics(byName);
+        } else {
+          setMetrics({});
+        }
+      } else {
+        setMetrics({});
+      }
     } catch (e) {}
     setLoading(false);
   }, [namespace]);
@@ -105,6 +122,22 @@ export default function Pods({ namespace }) {
       render: (row) => <StatusBadge status={row.status} />,
     },
     { header: 'Restarts', accessor: 'restarts' },
+    {
+      header: 'CPU',
+      accessor: 'cpu',
+      render: (row) => {
+        const m = metrics[row.name];
+        return <span className="text-xs text-gray-300">{m ? `${m.cpuMillicores}m` : '-'}</span>;
+      },
+    },
+    {
+      header: 'Memory',
+      accessor: 'memory',
+      render: (row) => {
+        const m = metrics[row.name];
+        return <span className="text-xs text-gray-300">{m ? `${m.memoryMiB}Mi` : '-'}</span>;
+      },
+    },
     { header: 'Containers', accessor: 'containers' },
     {
       header: 'IP',
