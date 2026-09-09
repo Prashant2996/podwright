@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import ResourceTable from '../components/ResourceTable';
-import YamlModal from '../components/YamlModal';
+import ResourceViewModal from '../components/ResourceViewModal';
 
 function timeAgo(timestamp) {
   if (!timestamp) return '-';
@@ -16,7 +16,7 @@ function timeAgo(timestamp) {
 export default function StatefulSets({ namespace }) {
   const [loading, setLoading] = useState(true);
   const [statefulsets, setStatefulsets] = useState([]);
-  const [yamlData, setYamlData] = useState(null);
+  const [viewResource, setViewResource] = useState(null);
 
   const fetchData = useCallback(async () => {
     if (!namespace) return;
@@ -48,7 +48,7 @@ export default function StatefulSets({ namespace }) {
           columns={columns}
           data={statefulsets}
           actions={(row) => (
-            <button onClick={() => setYamlData(row)} className="text-gray-400 hover:text-white" title="View YAML">
+            <button onClick={() => setViewResource(row)} className="text-gray-400 hover:text-white" title="View YAML / Describe">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
               </svg>
@@ -56,7 +56,15 @@ export default function StatefulSets({ namespace }) {
           )}
         />
       </div>
-      {yamlData && <YamlModal data={yamlData} title={`StatefulSet: ${yamlData.name}`} onClose={() => setYamlData(null)} />}
+      {viewResource && (
+        <ResourceViewModal
+          kind="statefulsets"
+          name={viewResource.name}
+          namespace={namespace}
+          title={`StatefulSet: ${viewResource.name}`}
+          onClose={() => setViewResource(null)}
+        />
+      )}
     </div>
   );
 }

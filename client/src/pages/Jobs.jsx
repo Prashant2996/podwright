@@ -3,7 +3,7 @@ import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import ResourceTable from '../components/ResourceTable';
 import StatusBadge from '../components/StatusBadge';
-import YamlModal from '../components/YamlModal';
+import ResourceViewModal from '../components/ResourceViewModal';
 
 function timeAgo(timestamp) {
   if (!timestamp) return '-';
@@ -17,7 +17,7 @@ function timeAgo(timestamp) {
 export default function Jobs({ namespace }) {
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState([]);
-  const [yamlData, setYamlData] = useState(null);
+  const [viewResource, setViewResource] = useState(null);
 
   const fetchData = useCallback(async () => {
     if (!namespace) return;
@@ -49,7 +49,7 @@ export default function Jobs({ namespace }) {
           columns={columns}
           data={jobs}
           actions={(row) => (
-            <button onClick={() => setYamlData(row)} className="text-gray-400 hover:text-white" title="View YAML">
+            <button onClick={() => setViewResource(row)} className="text-gray-400 hover:text-white" title="View YAML / Describe">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
               </svg>
@@ -57,7 +57,15 @@ export default function Jobs({ namespace }) {
           )}
         />
       </div>
-      {yamlData && <YamlModal data={yamlData} title={`Job: ${yamlData.name}`} onClose={() => setYamlData(null)} />}
+      {viewResource && (
+        <ResourceViewModal
+          kind="jobs"
+          name={viewResource.name}
+          namespace={namespace}
+          title={`Job: ${viewResource.name}`}
+          onClose={() => setViewResource(null)}
+        />
+      )}
     </div>
   );
 }

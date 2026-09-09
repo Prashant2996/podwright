@@ -2211,6 +2211,89 @@ app.post('/api/apply/validate', async (req, res) => {
   }
 });
 
+// --- Generic resource operations (any kind, including CRDs) ---
+// Runs kubectl with an argument array (no shell = no injection) and returns
+// { code, stdout, stderr }. Unlike execFileAsync, this preserves the exit code
+// so callers can distinguish success from "not found" / "forbidden".
+function kubectlCapture(args, { stdin } = {}) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('kubectl', args, { env: process.env });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', d => { stdout += d.toString(); });
+    proc.stderr.on('data', d => { stderr += d.toString(); });
+    proc.on('error', reject);
+    proc.on('close', code => resolve({ code, stdout, stderr }));
+    if (stdin != null) {
+      proc.stdin.write(stdin);
+    }
+    proc.stdin.end();
+  });
+}
+
+// Map a kubectl error into an HTTP status + friendly message.
+function kubectlErrorStatus(stderr) {
+  const s = (stderr || '').toLowerCase();
+  if (s.includes('not found')) return { status: 404, message: stderr.trim() };
+  if (s.includes('forbidden')) return { status: 403, message: 'You do not have permission for this resource.' };
+  if (s.includes('the server doesn\'t have a resource type') || s.includes('unknown resource')) {
+    return { status: 400, message: stderr.trim() };
+  }
+  return { status: 500, message: (stderr || 'kubectl command failed').trim() };
+}
+
+// A resource "kind" here is really the kubectl resource selector: a plural
+// type, a type.group (e.g. deployments.apps), or a CRD short/long name. We
+// validate it against a permissive-but-safe pattern (letters, digits, dots,
+// hyphens) so it can never inject shell args — spawn already avoids a shell,
+// this just rejects obviously bad input early.
+const K8S_KIND_RE = /^[a-zA-Z][a-zA-Z0-9.\-]*$/;
+function validateKind(kind) {
+  if (typeof kind !== 'string' || !K8S_KIND_RE.test(kind)) {
+    throw new Error(`Invalid resource kind: "${kind}"`);
+  }
+}
+
+// View full YAML for any resource
+app.get('/api/resource/:kind/:name/yaml', async (req, res) => {
+  const { kind, name } = req.params;
+  const { namespace } = req.query;
+  try {
+    validateKind(kind);
+    validateNames(name);
+    if (namespace) validateNames(namespace);
+    const args = ['get', kind, name, '-o', 'yaml', ...(namespace ? ['-n', namespace] : [])];
+    const { code, stdout, stderr } = await kubectlCapture(args);
+    if (code !== 0) {
+      const { status, message } = kubectlErrorStatus(stderr);
+      return res.status(status).json({ error: message });
+    }
+    res.type('text/plain').send(stdout);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// kubectl describe for any resource
+app.get('/api/resource/:kind/:name/describe', async (req, res) => {
+  const { kind, name } = req.params;
+  const { namespace } = req.query;
+  try {
+    validateKind(kind);
+    validateNames(name);
+    if (namespace) validateNames(namespace);
+    const args = ['describe', kind, name, ...(namespace ? ['-n', namespace] : [])];
+    const { code, stdout, stderr } = await kubectlCapture(args);
+    if (code !== 0) {
+      const { status, message } = kubectlErrorStatus(stderr);
+      return res.status(status).json({ error: message });
+    }
+    res.type('text/plain').send(stdout);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 // --- Port Forwarding ---
 const portForwards = new Map(); // id -> { process, namespace, resource, resourceName, localPort, remotePort, status }
 
