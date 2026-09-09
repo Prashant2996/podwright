@@ -2315,6 +2315,67 @@ app.delete('/api/resource/:kind/:name', async (req, res) => {
   }
 });
 
+// --- Custom Resource Definitions (CRDs) ---
+// List all CRDs installed in the cluster. Returns metadata needed to then list
+// their instances: group, scope, kind, plural, and the storage/served version.
+app.get('/api/crds', async (req, res) => {
+  try {
+    const { code, stdout, stderr } = await kubectlCapture(['get', 'crd', '-o', 'json']);
+    if (code !== 0) {
+      const { status, message } = kubectlErrorStatus(stderr);
+      return res.status(status).json({ error: message });
+    }
+    const parsed = JSON.parse(stdout);
+    const crds = (parsed.items || []).map(c => {
+      const versions = c.spec.versions || [];
+      const served = versions.find(v => v.served) || versions[0] || {};
+      return {
+        name: c.metadata.name,
+        group: c.spec.group,
+        scope: c.spec.scope, // 'Namespaced' | 'Cluster'
+        kind: c.spec.names?.kind,
+        plural: c.spec.names?.plural,
+        shortNames: c.spec.names?.shortNames || [],
+        version: served.name,
+        // Selector kubectl understands for listing instances (plural.group).
+        selector: `${c.spec.names?.plural}.${c.spec.group}`,
+        established: (c.status?.conditions || []).some(cn => cn.type === 'Established' && cn.status === 'True'),
+        age: c.metadata.creationTimestamp,
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+    res.json(crds);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// List instances of a given custom resource type. :crd is the plural.group
+// selector (e.g. "widgets.demo.podwright.in"). namespace optional (omit for
+// cluster-scoped CRDs).
+app.get('/api/custom-resources/:crd', async (req, res) => {
+  const { crd } = req.params;
+  const { namespace } = req.query;
+  try {
+    validateKind(crd);
+    if (namespace) validateNames(namespace);
+    const args = ['get', crd, '-o', 'json', ...(namespace ? ['-n', namespace] : ['-A'])];
+    const { code, stdout, stderr } = await kubectlCapture(args);
+    if (code !== 0) {
+      const { status, message } = kubectlErrorStatus(stderr);
+      return res.status(status).json({ error: message });
+    }
+    const parsed = JSON.parse(stdout);
+    const items = (parsed.items || []).map(it => ({
+      name: it.metadata?.name,
+      namespace: it.metadata?.namespace || null,
+      age: it.metadata?.creationTimestamp,
+    }));
+    res.json(items);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- Port Forwarding ---
 const portForwards = new Map(); // id -> { process, namespace, resource, resourceName, localPort, remotePort, status }
 

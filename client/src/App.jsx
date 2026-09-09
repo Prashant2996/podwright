@@ -18,6 +18,7 @@ import Jobs from './pages/Jobs';
 import CronJobs from './pages/CronJobs';
 import PVCs from './pages/PVCs';
 import Nodes from './pages/Nodes';
+import CustomResources from './pages/CustomResources';
 import Events from './pages/Events';
 import Search from './pages/Search';
 import HealthCheck from './pages/HealthCheck';
@@ -145,6 +146,7 @@ export default function App() {
               <Route path="/cronjobs" element={<CronJobs namespace={namespace} />} />
               <Route path="/pvcs" element={<PVCs namespace={namespace} />} />
               <Route path="/nodes" element={<Nodes />} />
+              <Route path="/custom-resources" element={<CustomResources namespace={namespace} />} />
               <Route path="/events" element={<Events namespace={namespace} />} />
               <Route path="/search" element={<Search namespace={namespace} />} />
               <Route path="/health" element={<HealthCheck namespace={namespace} />} />

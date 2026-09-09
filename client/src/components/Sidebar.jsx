@@ -26,6 +26,7 @@ import {
   ShieldCheckIcon,
   SparklesIcon,
   StarIcon,
+  PuzzlePieceIcon,
 } from '@heroicons/react/24/outline';
 import { useAutoRefreshControls } from '../hooks/useAutoRefresh';
 
@@ -66,6 +67,7 @@ const navSections = [
     title: 'Cluster',
     items: [
       { path: '/nodes', label: 'Nodes', icon: ServerIcon, countKey: null },
+      { path: '/custom-resources', label: 'Custom Resources', icon: PuzzlePieceIcon, countKey: null },
       { path: '/events', label: 'Events', icon: BoltIcon, countKey: null },
     ],
   },
