@@ -1,6 +1,8 @@
 # Podwright
 
-A fast, developer-first Kubernetes management dashboard with built-in troubleshooting, namespace automation, and real-time change tracking. Starts in under 3 seconds. No database, no external services.
+**Like k9s, but a GUI instead of a TUI.** A fast, developer-first Kubernetes dashboard that runs locally off your own kubeconfig — nothing leaves your machine. Built-in troubleshooting, namespace automation, and real-time change tracking. Starts in under 3 seconds. No database, no external services.
+
+> ⭐ Star to follow — a one-click desktop app for Mac & Windows is on the way.
 
 ![Workloads Overview](docs/screenshots/01-overview.png)
 
