@@ -165,6 +165,7 @@ export default function CronJobs({ namespace }) {
           namespace={namespace}
           title={`CronJob: ${viewResource.name}`}
           onClose={() => setViewResource(null)}
+          onDeleted={fetchData}
         />
       )}
     </div>

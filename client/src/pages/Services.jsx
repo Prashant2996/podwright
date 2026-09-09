@@ -70,6 +70,7 @@ export default function Services({ namespace }) {
           namespace={namespace}
           title={`Service: ${viewResource.name}`}
           onClose={() => setViewResource(null)}
+          onDeleted={fetchData}
         />
       )}
     </div>

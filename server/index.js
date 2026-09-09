@@ -2294,6 +2294,27 @@ app.get('/api/resource/:kind/:name/describe', async (req, res) => {
   }
 });
 
+// Delete any resource
+app.delete('/api/resource/:kind/:name', async (req, res) => {
+  const { kind, name } = req.params;
+  const { namespace } = req.query;
+  try {
+    validateKind(kind);
+    validateNames(name);
+    if (namespace) validateNames(namespace);
+    const args = ['delete', kind, name, ...(namespace ? ['-n', namespace] : [])];
+    const { code, stdout, stderr } = await kubectlCapture(args);
+    if (code !== 0) {
+      const { status, message } = kubectlErrorStatus(stderr);
+      return res.status(status).json({ error: message });
+    }
+    if (namespace) invalidateNamespace(namespace);
+    res.json({ success: true, message: stdout.trim() || `${kind}/${name} deleted` });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 // --- Port Forwarding ---
 const portForwards = new Map(); // id -> { process, namespace, resource, resourceName, localPort, remotePort, status }
 

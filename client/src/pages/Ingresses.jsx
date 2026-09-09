@@ -70,6 +70,7 @@ export default function Ingresses({ namespace }) {
           namespace={namespace}
           title={`Ingress: ${viewResource.name}`}
           onClose={() => setViewResource(null)}
+          onDeleted={fetchData}
         />
       )}
     </div>

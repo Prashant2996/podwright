@@ -65,6 +65,7 @@ export default function Nodes() {
           name={viewResource.name}
           title={`Node: ${viewResource.name}`}
           onClose={() => setViewResource(null)}
+          onDeleted={fetchData}
         />
       )}
     </div>

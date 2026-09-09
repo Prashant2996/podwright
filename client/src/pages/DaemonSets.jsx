@@ -65,6 +65,7 @@ export default function DaemonSets({ namespace }) {
           namespace={namespace}
           title={`DaemonSet: ${viewResource.name}`}
           onClose={() => setViewResource(null)}
+          onDeleted={fetchData}
         />
       )}
     </div>

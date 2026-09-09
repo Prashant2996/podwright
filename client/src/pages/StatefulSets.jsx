@@ -63,6 +63,7 @@ export default function StatefulSets({ namespace }) {
           namespace={namespace}
           title={`StatefulSet: ${viewResource.name}`}
           onClose={() => setViewResource(null)}
+          onDeleted={fetchData}
         />
       )}
     </div>

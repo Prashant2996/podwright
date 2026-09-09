@@ -66,6 +66,7 @@ export default function PVCs({ namespace }) {
           namespace={namespace}
           title={`PVC: ${viewResource.name}`}
           onClose={() => setViewResource(null)}
+          onDeleted={fetchData}
         />
       )}
     </div>

@@ -64,6 +64,7 @@ export default function Jobs({ namespace }) {
           namespace={namespace}
           title={`Job: ${viewResource.name}`}
           onClose={() => setViewResource(null)}
+          onDeleted={fetchData}
         />
       )}
     </div>

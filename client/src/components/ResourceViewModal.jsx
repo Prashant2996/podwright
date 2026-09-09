@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import CopyButton from './CopyButton';
+import { useConfirm } from './ConfirmModal';
+import { useToast } from './Toast';
 
 // Highlight a single line of YAML text (server-provided real kubectl YAML).
 function highlightYamlLine(line) {
@@ -60,8 +62,11 @@ function TextBlock({ text, highlight }) {
  *  - namespace: optional (omit for cluster-scoped resources)
  *  - title: optional heading override
  *  - onClose: () => void
+ *  - onDeleted: optional () => void called after a successful delete (e.g. to refresh the list)
  */
-export default function ResourceViewModal({ kind, name, namespace, title, onClose }) {
+export default function ResourceViewModal({ kind, name, namespace, title, onClose, onDeleted }) {
+  const confirm = useConfirm();
+  const { addToast } = useToast();
   const [tab, setTab] = useState('yaml');
   const [yaml, setYaml] = useState('');
   const [describe, setDescribe] = useState('');
@@ -154,6 +159,29 @@ export default function ResourceViewModal({ kind, name, namespace, title, onClos
     }
   }
 
+  async function handleDelete() {
+    const ok = await confirm({
+      title: `Delete ${kind}`,
+      message: `Permanently delete "${name}"${namespace ? ` in ${namespace}` : ''}? This cannot be undone.`,
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      const url = `/api/resource/${encodeURIComponent(kind)}/${encodeURIComponent(name)}${nsQuery}`;
+      const res = await fetch(url, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) {
+        addToast(data.error || 'Delete failed', 'error');
+      } else {
+        addToast(data.message || `${name} deleted`, 'success');
+        if (onDeleted) onDeleted();
+        onClose();
+      }
+    } catch (e) {
+      addToast('Delete failed: ' + e.message, 'error');
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
@@ -193,6 +221,11 @@ export default function ResourceViewModal({ kind, name, namespace, title, onClos
                   Cancel
                 </button>
               </>
+            )}
+            {!editing && !error && (
+              <button onClick={handleDelete} className="btn-danger btn-sm" title={`Delete this ${kind}`}>
+                Delete
+              </button>
             )}
             {activeText && !error && !editing && <CopyButton text={activeText} />}
             <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close">
