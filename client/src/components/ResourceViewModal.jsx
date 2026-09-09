@@ -68,6 +68,13 @@ export default function ResourceViewModal({ kind, name, namespace, title, onClos
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Edit mode state
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [saveMsg, setSaveMsg] = useState('');
+
   const nsQuery = namespace ? `?namespace=${encodeURIComponent(namespace)}` : '';
 
   useEffect(() => {
@@ -108,6 +115,45 @@ export default function ResourceViewModal({ kind, name, namespace, title, onClos
 
   const activeText = tab === 'yaml' ? yaml : describe;
 
+  function startEdit() {
+    setDraft(yaml);
+    setEditing(true);
+    setSaveError('');
+    setSaveMsg('');
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+    setDraft('');
+    setSaveError('');
+  }
+
+  async function saveEdit() {
+    setSaving(true);
+    setSaveError('');
+    setSaveMsg('');
+    try {
+      const res = await fetch('/api/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ yaml: draft, namespace: namespace || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSaveError(data.error || 'Apply failed');
+      } else {
+        setSaveMsg(data.message || 'Applied successfully');
+        // Refresh the stored YAML with what the server now has.
+        setYaml(draft);
+        setEditing(false);
+      }
+    } catch (e) {
+      setSaveError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
@@ -120,19 +166,35 @@ export default function ResourceViewModal({ kind, name, namespace, title, onClos
           <div className="flex items-center gap-3">
             <div className="flex rounded-md overflow-hidden border border-gray-600">
               <button
-                onClick={() => setTab('yaml')}
+                onClick={() => { setTab('yaml'); }}
                 className={`px-3 py-1 text-xs ${tab === 'yaml' ? 'bg-k8s-blue text-white' : 'bg-gray-800 text-gray-400'}`}
               >
                 YAML
               </button>
               <button
-                onClick={() => setTab('describe')}
-                className={`px-3 py-1 text-xs ${tab === 'describe' ? 'bg-k8s-blue text-white' : 'bg-gray-800 text-gray-400'}`}
+                onClick={() => { if (editing) return; setTab('describe'); }}
+                disabled={editing}
+                className={`px-3 py-1 text-xs ${tab === 'describe' ? 'bg-k8s-blue text-white' : 'bg-gray-800 text-gray-400'} ${editing ? 'opacity-40 cursor-not-allowed' : ''}`}
               >
                 Describe
               </button>
             </div>
-            {activeText && !error && <CopyButton text={activeText} />}
+            {tab === 'yaml' && !editing && yaml && !error && (
+              <button onClick={startEdit} className="btn-secondary btn-sm" title="Edit YAML and apply">
+                Edit
+              </button>
+            )}
+            {editing && (
+              <>
+                <button onClick={saveEdit} disabled={saving} className="btn-primary btn-sm disabled:opacity-50">
+                  {saving ? 'Applying…' : 'Apply'}
+                </button>
+                <button onClick={cancelEdit} disabled={saving} className="btn-secondary btn-sm disabled:opacity-50">
+                  Cancel
+                </button>
+              </>
+            )}
+            {activeText && !error && !editing && <CopyButton text={activeText} />}
             <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -140,8 +202,20 @@ export default function ResourceViewModal({ kind, name, namespace, title, onClos
             </button>
           </div>
         </div>
+        {(saveError || saveMsg) && (
+          <div className={`px-4 py-2 text-xs whitespace-pre-wrap ${saveError ? 'text-red-400 bg-red-500/10' : 'text-green-400 bg-green-500/10'}`}>
+            {saveError || saveMsg}
+          </div>
+        )}
         <div className="flex-1 overflow-auto p-4 log-viewer rounded-b-lg">
-          {loading ? (
+          {editing ? (
+            <textarea
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              spellCheck={false}
+              className="w-full h-[55vh] bg-transparent font-mono text-xs leading-5 resize-none outline-none"
+            />
+          ) : loading ? (
             <div className="text-gray-500 text-sm">Loading…</div>
           ) : error ? (
             <div className="text-red-400 text-sm whitespace-pre-wrap">{error}</div>
